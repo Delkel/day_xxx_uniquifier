@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import random
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Strength:
+    crop_pct: tuple[float, float]
+    start_trim: tuple[float, float]
+    brightness: tuple[float, float]
+    contrast: tuple[float, float]
+    saturation: tuple[float, float]
+    speed: tuple[float, float]
+    noise: tuple[int, int]
+    fps_choices: tuple[int, ...]
+    crf: tuple[int, int] = (20, 24)
+    video_bitrate: tuple[str, str] | None = None
+
+
+STRENGTHS = {
+    "light": Strength(
+        crop_pct=(0.006, 0.018),
+        start_trim=(0.0, 0.0),
+        brightness=(-0.012, 0.012),
+        contrast=(0.985, 1.015),
+        saturation=(0.985, 1.025),
+        speed=(0.992, 1.008),
+        noise=(1, 2),
+        fps_choices=(29, 30, 31),
+    ),
+    "normal": Strength(
+        crop_pct=(0.012, 0.035),
+        start_trim=(0.0, 0.08),
+        brightness=(-0.025, 0.025),
+        contrast=(0.965, 1.04),
+        saturation=(0.965, 1.06),
+        speed=(0.985, 1.018),
+        noise=(1, 4),
+        fps_choices=(29, 30, 31, 59, 60),
+    ),
+    "strong": Strength(
+        crop_pct=(0.025, 0.06),
+        start_trim=(0.05, 0.18),
+        brightness=(-0.045, 0.045),
+        contrast=(0.94, 1.075),
+        saturation=(0.93, 1.10),
+        speed=(0.972, 1.032),
+        noise=(2, 7),
+        fps_choices=(28, 29, 30, 31, 58, 59, 60),
+    ),
+    "instagram": Strength(
+        crop_pct=(0.060, 0.110),
+        start_trim=(0.20, 0.60),
+        brightness=(-0.070, 0.065),
+        contrast=(0.91, 1.14),
+        saturation=(0.89, 1.18),
+        speed=(0.952, 1.058),
+        noise=(2, 5),
+        fps_choices=(28, 29, 30, 31),
+        crf=(18, 21),
+        video_bitrate=("8M", "12M"),
+    ),
+}
+
+
+def run(command: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def require_binary(name: str) -> None:
+    if not shutil.which(name):
+        print(f"Missing dependency: {name}", file=sys.stderr)
+        sys.exit(1)
+
+
+def probe(path: Path) -> dict:
+    result = run([
+        "ffprobe",
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_streams",
+        str(path),
+    ])
+    if result.returncode != 0:
+        print(result.stderr.strip(), file=sys.stderr)
+        sys.exit(result.returncode)
+    return json.loads(result.stdout)
+
+
+def video_size(info: dict) -> tuple[int, int]:
+    for stream in info.get("streams", []):
+        if stream.get("codec_type") == "video":
+            return int(stream["width"]), int(stream["height"])
+    raise SystemExit("No video stream found")
+
+
+def has_audio(info: dict) -> bool:
+    return any(stream.get("codec_type") == "audio" for stream in info.get("streams", []))
+
+
+def even(value: int) -> int:
+    return value if value % 2 == 0 else value - 1
+
+
+def build_filters(width: int, height: int, rng: random.Random, strength: Strength, strength_name: str) -> tuple[str, float, float]:
+    crop_pct = rng.uniform(*strength.crop_pct)
+    crop_w = even(max(16, int(width * (1 - crop_pct))))
+    crop_h = even(max(16, int(height * (1 - crop_pct))))
+    crop_x = max(0, width - crop_w)
+    crop_y = max(0, height - crop_h)
+    x = rng.randint(0, crop_x) if crop_x else 0
+    y = rng.randint(0, crop_y) if crop_y else 0
+
+    brightness = rng.uniform(*strength.brightness)
+    contrast = rng.uniform(*strength.contrast)
+    saturation = rng.uniform(*strength.saturation)
+    speed = rng.uniform(*strength.speed)
+    start_trim = rng.uniform(*strength.start_trim)
+    noise = rng.randint(*strength.noise)
+    fps = rng.choice(strength.fps_choices)
+
+    filters = []
+    if start_trim > 0:
+        filters += [f"trim=start={start_trim:.3f}", "setpts=PTS-STARTPTS"]
+    filters += [
+        f"crop={crop_w}:{crop_h}:{x}:{y}",
+        f"scale={width}:{height}:flags=lanczos",
+        f"eq=brightness={brightness:.4f}:contrast={contrast:.4f}:saturation={saturation:.4f}",
+        f"noise=alls={noise}:allf=t+u",
+    ]
+    if strength_name == "instagram":
+        filters.append(f"unsharp=3:3:{rng.uniform(0.08, 0.18):.3f}:3:3:0.0")
+    filters += [f"fps={fps}", f"setpts={1 / speed:.6f}*PTS", "setsar=1", "format=yuv420p"]
+    return ",".join(filters), speed, start_trim
+
+
+def output_name(input_path: Path, index: int, seed: int) -> str:
+    return f"{input_path.stem}_unique_{index:02d}_seed{seed}.mp4"
+
+
+def capcut_metadata_args() -> list[str]:
+    return [
+        "-brand",
+        "mp42",
+        "-metadata",
+        "title=CapCut",
+        "-metadata",
+        "encoder=CapCut",
+        "-metadata",
+        "software=CapCut",
+        "-metadata",
+        "com.apple.quicktime.software=CapCut",
+        "-metadata",
+        "comment=Edited with CapCut",
+        "-metadata:s:v:0",
+        "handler_name=CapCut Video Media Handler",
+        "-metadata:s:a:0",
+        "handler_name=CapCut Audio Media Handler",
+    ]
+
+
+def uniquify(
+    input_path: Path,
+    output_dir: Path,
+    count: int,
+    base_seed: int | None,
+    strength_name: str,
+    capcut_metadata: bool = False,
+) -> None:
+    require_binary("ffmpeg")
+    require_binary("ffprobe")
+
+    if not input_path.exists():
+        raise SystemExit(f"Input file does not exist: {input_path}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    info = probe(input_path)
+    width, height = video_size(info)
+    audio = has_audio(info)
+    strength = STRENGTHS[strength_name]
+
+    for index in range(1, count + 1):
+        seed = base_seed + index - 1 if base_seed is not None else random.SystemRandom().randint(100000, 999999999)
+        rng = random.Random(seed)
+        vf, speed, start_trim = build_filters(width, height, rng, strength, strength_name)
+        output_path = output_dir / output_name(input_path, index, seed)
+
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-i",
+            str(input_path),
+            "-map",
+            "0:v:0",
+        ]
+
+        if audio:
+            audio_filters = []
+            if start_trim > 0:
+                audio_filters += [f"atrim=start={start_trim:.3f}", "asetpts=PTS-STARTPTS"]
+            audio_filters += [f"atempo={speed:.6f}", f"volume={rng.uniform(0.970, 1.025):.4f}"]
+            if strength_name == "instagram":
+                audio_filters += [f"highpass=f={rng.randint(35, 55)}"]
+            cmd += ["-map", "0:a:0?", "-filter:a", ",".join(audio_filters)]
+
+        cmd += [
+            "-filter:v",
+            vf,
+            "-map_metadata",
+            "-1",
+        ]
+        if capcut_metadata:
+            cmd += capcut_metadata_args()
+        cmd += [
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            str(rng.randint(*strength.crf)),
+            "-g",
+            str(rng.choice([45, 48, 50, 60, 72])),
+            "-movflags",
+            "+faststart+use_metadata_tags" if capcut_metadata else "+faststart",
+        ]
+        if strength.video_bitrate:
+            target = rng.choice(strength.video_bitrate)
+            cmd += ["-b:v", target, "-maxrate", target, "-bufsize", "16M"]
+
+        if audio:
+            cmd += ["-c:a", "aac", "-b:a", "128k"]
+
+        cmd += [str(output_path)]
+
+        print(f"[{index}/{count}] writing {output_path}")
+        result = run(cmd)
+        if result.returncode != 0:
+            print(result.stderr, file=sys.stderr)
+            raise SystemExit(result.returncode)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Create subtly unique variants of a video.")
+    parser.add_argument("input", type=Path, help="Input video file")
+    parser.add_argument("-o", "--output-dir", type=Path, default=Path("outputs"), help="Directory for generated videos")
+    parser.add_argument("-n", "--count", type=int, default=1, help="Number of variants to create")
+    parser.add_argument("--seed", type=int, default=None, help="Base seed for repeatable output")
+    parser.add_argument("--strength", choices=sorted(STRENGTHS), default="normal", help="Transformation strength")
+    parser.add_argument("--capcut-metadata", action="store_true", help="Add CapCut-like MP4 metadata tags")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    if args.count < 1:
+        raise SystemExit("--count must be at least 1")
+    uniquify(args.input, args.output_dir, args.count, args.seed, args.strength, args.capcut_metadata)
+
+
+if __name__ == "__main__":
+    main()

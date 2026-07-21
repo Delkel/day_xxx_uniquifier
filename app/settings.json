@@ -1,0 +1,14 @@
+{
+  "strength": "instagram",
+  "variantsPerVideo": 1,
+  "separateCopyFolders": true,
+  "moveOriginals": true,
+  "processVideos": true,
+  "processPhotos": false,
+  "generateCaptions": true,
+  "captionStyle": "beauty",
+  "captionsPerItem": 3,
+  "pollSeconds": 5,
+  "capcutMetadata": false,
+  "updateManifestUrl": ""
+}

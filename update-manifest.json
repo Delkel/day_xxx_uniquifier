@@ -1,0 +1,5 @@
+{
+  "version": "1.1.0",
+  "zip_url": "https://github.com/USER/day_xxx_uniquifier/releases/download/v1.1.0/day_xxx_uniquifier_macos_app.zip",
+  "notes": "Mac-приложение с кнопкой проверки обновлений, установкой в ~/Applications, запасным start.command и автоматическим снятием quarantine-метки."
+}

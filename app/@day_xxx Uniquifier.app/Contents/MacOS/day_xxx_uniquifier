@@ -1,0 +1,45 @@
+#!/bin/sh
+APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+RESOURCES="$APP_DIR/Resources"
+APP_BUNDLE="$(cd "$APP_DIR/.." && pwd)"
+LOG_DIR="$HOME/Library/Logs"
+LOG_FILE="$LOG_DIR/day_xxx_uniquifier.log"
+case "$APP_BUNDLE" in
+  /Applications/*|"$HOME"/Applications/*)
+    ROOT="$HOME/Movies/day_xxx_uniquifier"
+    ;;
+  *)
+    ROOT="$(cd "$APP_DIR/../../.." && pwd)"
+    ;;
+esac
+export DAYXXX_UNIQUIFIER_ROOT="$ROOT"
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+mkdir -p "$LOG_DIR"
+{
+  echo "== @day_xxx Uniquifier launch =="
+  date
+  echo "APP_BUNDLE=$APP_BUNDLE"
+  echo "ROOT=$ROOT"
+  echo "PATH=$PATH"
+} > "$LOG_FILE"
+
+if command -v python3 >/dev/null 2>&1; then
+  python3 "$RESOURCES/app.py" >> "$LOG_FILE" 2>&1
+  STATUS=$?
+  if [ "$STATUS" -ne 0 ]; then
+    osascript -e 'display dialog "@day_xxx Uniquifier не смог запуститься. Я открою лог ошибки; чаще всего нужно запустить установщик зависимостей из архива." buttons {"OK"} default button "OK" with icon stop' >/dev/null 2>&1
+    open "$LOG_FILE" >/dev/null 2>&1
+  fi
+  exit "$STATUS"
+fi
+
+ANSWER="$(osascript -e 'button returned of (display dialog "Нужен Python 3. Поставить автоматически через Homebrew? Это может занять несколько минут." buttons {"Отмена", "Поставить"} default button "Поставить" with icon caution)' 2>/dev/null)"
+if [ "$ANSWER" = "Поставить" ]; then
+  INSTALL_SCRIPT="$RESOURCES/install_dependencies.sh"
+  osascript -e "tell application \"Terminal\" to do script quoted form of \"$INSTALL_SCRIPT\""
+  osascript -e 'display dialog "Установка открыта в Terminal. Когда она завершится, запусти приложение снова." buttons {"OK"} default button "OK" with icon note'
+else
+  osascript -e 'display dialog "Без Python 3 приложение не запустится." buttons {"OK"} default button "OK" with icon stop'
+fi
+exit 1

@@ -1,0 +1,22 @@
+Если macOS пишет:
+«Install @day_xxx Uniquifier.command повреждено, и его не удается открыть»
+
+Это Gatekeeper/quarantine после скачивания из Telegram, а не ошибка приложения.
+
+Что сделать:
+
+1. Открой Terminal.
+2. Напечатай:
+
+xattr -dr com.apple.quarantine 
+
+3. Поставь пробел после команды.
+4. Перетащи распакованную папку day_xxx_uniquifier_macos в окно Terminal.
+5. Нажми Enter.
+6. Снова открой start.command или Install @day_xxx Uniquifier.command.
+
+Пример готовой команды:
+
+xattr -dr com.apple.quarantine "/Users/you/Downloads/day_xxx_uniquifier_macos"
+
+В свежей сборке start.command и установщик сами пробуют снять quarantine-метку. Ручная команда нужна только если macOS вообще не дает открыть скачанный файл. Для полной установки без такого предупреждения нужен Apple Developer ID и notarization.
