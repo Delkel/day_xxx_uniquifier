@@ -16,8 +16,9 @@ import uniquify_engine
 
 
 APP_NAME = "@day_xxx Uniquifier"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
+PACKAGED_SETTINGS_PATH = Path(__file__).resolve().parents[3] / "settings.json"
 DEFAULT_SETTINGS = {
     "strength": "instagram",
     "variantsPerVideo": 1,
@@ -54,15 +55,25 @@ def ensure_dirs() -> None:
 
 
 def load_settings() -> dict:
+    packaged = dict(DEFAULT_SETTINGS)
+    if PACKAGED_SETTINGS_PATH.exists():
+        try:
+            packaged.update(json.loads(PACKAGED_SETTINGS_PATH.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+
     if not SETTINGS_PATH.exists():
-        save_settings(DEFAULT_SETTINGS)
-        return dict(DEFAULT_SETTINGS)
+        save_settings(packaged)
+        return packaged
     try:
         data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
     except Exception:
-        return dict(DEFAULT_SETTINGS)
-    merged = dict(DEFAULT_SETTINGS)
+        return packaged
+    merged = dict(packaged)
     merged.update(data)
+    if not manifest_url(merged) and manifest_url(packaged):
+        merged["updateManifestUrl"] = manifest_url(packaged)
+        save_settings(merged)
     return merged
 
 

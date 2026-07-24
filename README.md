@@ -56,17 +56,17 @@ xattr -dr com.apple.quarantine "/путь/к/day_xxx_uniquifier_macos"
 
 \`\`\`json
 {
-  "version": "1.1.0",
-  "zip_url": "https://github.com/day-xxx/day_xxx_uniquifier/releases/download/v1.1.0/day_xxx_uniquifier_macos_app.zip",
+  "version": "1.2.0",
+  "zip_url": "https://github.com/day-xxx/day_xxx_uniquifier/releases/download/v1.2.0/day_xxx_uniquifier_macos_app.zip",
   "notes": "Что изменилось в версии"
 }
 \`\`\`
 
-После создания реального GitHub-репозитория нужно прописать прямую raw-ссылку на этот JSON в `settings.json`:
+В этой сборке ссылка уже прописана под репозиторий `day-xxx/day_xxx_uniquifier`. Если репозиторий будет другим, нужно заменить прямую raw-ссылку в `settings.json`:
 
 \`\`\`json
 {
-  "updateManifestUrl": "https://raw.githubusercontent.com/USER/REPO/main/update-manifest.json"
+  "updateManifestUrl": "https://raw.githubusercontent.com/day-xxx/day_xxx_uniquifier/main/update-manifest.json"
 }
 \`\`\`
 
