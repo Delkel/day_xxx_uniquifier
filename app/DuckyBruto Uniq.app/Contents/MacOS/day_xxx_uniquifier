@@ -17,7 +17,7 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PAT
 
 mkdir -p "$LOG_DIR"
 {
-  echo "== @day_xxx Uniquifier launch =="
+  echo "== DuckyBruto Uniq launch =="
   date
   echo "APP_BUNDLE=$APP_BUNDLE"
   echo "ROOT=$ROOT"
@@ -28,7 +28,7 @@ if command -v python3 >/dev/null 2>&1; then
   python3 "$RESOURCES/app.py" >> "$LOG_FILE" 2>&1
   STATUS=$?
   if [ "$STATUS" -ne 0 ]; then
-    osascript -e 'display dialog "@day_xxx Uniquifier не смог запуститься. Я открою лог ошибки; чаще всего нужно запустить установщик зависимостей из архива." buttons {"OK"} default button "OK" with icon stop' >/dev/null 2>&1
+    osascript -e 'display dialog "DuckyBruto Uniq не смог запуститься. Я открою лог ошибки; чаще всего нужно запустить установщик зависимостей из архива." buttons {"OK"} default button "OK" with icon stop' >/dev/null 2>&1
     open "$LOG_FILE" >/dev/null 2>&1
   fi
   exit "$STATUS"

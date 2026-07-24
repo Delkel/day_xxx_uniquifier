@@ -4,7 +4,7 @@
   "separateCopyFolders": true,
   "moveOriginals": true,
   "processVideos": true,
-  "processPhotos": false,
+  "processPhotos": true,
   "generateCaptions": true,
   "captionStyle": "beauty",
   "captionsPerItem": 3,

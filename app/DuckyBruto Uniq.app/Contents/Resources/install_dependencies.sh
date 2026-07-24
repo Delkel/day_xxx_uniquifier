@@ -3,7 +3,7 @@ set -eu
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
-echo "== @day_xxx Uniquifier dependency installer =="
+echo "== DuckyBruto Uniq dependency installer =="
 echo
 
 if ! command -v brew >/dev/null 2>&1; then
@@ -54,7 +54,7 @@ else
 fi
 
 echo
-echo "Готово. Можно запускать @day_xxx Uniquifier."
+echo "Готово. Можно запускать DuckyBruto Uniq."
 if [ "${DAYXXX_NO_PAUSE:-0}" != "1" ]; then
   read -r -p "Нажми Enter, чтобы закрыть окно..." _
 fi

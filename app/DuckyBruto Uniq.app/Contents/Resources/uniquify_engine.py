@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
+
+
 @dataclass(frozen=True)
 class Strength:
     crop_pct: tuple[float, float]
@@ -146,6 +149,10 @@ def output_name(input_path: Path, index: int, seed: int) -> str:
     return f"{input_path.stem}_unique_{index:02d}_seed{seed}.mp4"
 
 
+def photo_output_name(input_path: Path, index: int, seed: int) -> str:
+    return f"{input_path.stem}_unique_{index:02d}_seed{seed}.jpg"
+
+
 def capcut_metadata_args() -> list[str]:
     return [
         "-brand",
@@ -240,6 +247,83 @@ def uniquify(
             cmd += ["-c:a", "aac", "-b:a", "128k"]
 
         cmd += [str(output_path)]
+
+        print(f"[{index}/{count}] writing {output_path}")
+        result = run(cmd)
+        if result.returncode != 0:
+            print(result.stderr, file=sys.stderr)
+            raise SystemExit(result.returncode)
+
+
+def build_photo_filters(width: int, height: int, rng: random.Random, strength: Strength, strength_name: str) -> str:
+    crop_pct = rng.uniform(*strength.crop_pct)
+    crop_w = even(max(16, int(width * (1 - crop_pct))))
+    crop_h = even(max(16, int(height * (1 - crop_pct))))
+    crop_x = max(0, width - crop_w)
+    crop_y = max(0, height - crop_h)
+    x = rng.randint(0, crop_x) if crop_x else 0
+    y = rng.randint(0, crop_y) if crop_y else 0
+
+    brightness = rng.uniform(*strength.brightness)
+    contrast = rng.uniform(*strength.contrast)
+    saturation = rng.uniform(*strength.saturation)
+    noise = rng.randint(*strength.noise)
+    rotate = rng.uniform(-0.35, 0.35) if strength_name in {"strong", "instagram"} else rng.uniform(-0.12, 0.12)
+
+    filters = [
+        f"crop={crop_w}:{crop_h}:{x}:{y}",
+        f"scale={width}:{height}:flags=lanczos",
+        f"eq=brightness={brightness:.4f}:contrast={contrast:.4f}:saturation={saturation:.4f}",
+        f"rotate={rotate}*PI/180:c=black@0:ow=rotw({rotate}*PI/180):oh=roth({rotate}*PI/180)",
+        f"crop={width}:{height}",
+        f"noise=alls={noise}:allf=t+u",
+    ]
+    if strength_name == "instagram":
+        filters.append(f"unsharp=5:5:{rng.uniform(0.18, 0.32):.3f}:3:3:0.0")
+    filters += ["setsar=1", "format=yuvj420p"]
+    return ",".join(filters)
+
+
+def uniquify_photo(
+    input_path: Path,
+    output_dir: Path,
+    count: int,
+    base_seed: int | None,
+    strength_name: str,
+) -> None:
+    require_binary("ffmpeg")
+    require_binary("ffprobe")
+
+    if not input_path.exists():
+        raise SystemExit(f"Input file does not exist: {input_path}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    info = probe(input_path)
+    width, height = video_size(info)
+    strength = STRENGTHS[strength_name]
+
+    for index in range(1, count + 1):
+        seed = base_seed + index - 1 if base_seed is not None else random.SystemRandom().randint(100000, 999999999)
+        rng = random.Random(seed)
+        vf = build_photo_filters(width, height, rng, strength, strength_name)
+        output_path = output_dir / photo_output_name(input_path, index, seed)
+
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-i",
+            str(input_path),
+            "-frames:v",
+            "1",
+            "-filter:v",
+            vf,
+            "-map_metadata",
+            "-1",
+            "-q:v",
+            str(rng.randint(2, 5)),
+            str(output_path),
+        ]
 
         print(f"[{index}/{count}] writing {output_path}")
         result = run(cmd)

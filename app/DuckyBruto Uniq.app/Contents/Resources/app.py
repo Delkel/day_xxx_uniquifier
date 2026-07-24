@@ -15,15 +15,17 @@ from tkinter import ttk
 import uniquify_engine
 
 
-APP_NAME = "@day_xxx Uniquifier"
+APP_NAME = "DuckyBruto Uniq"
 APP_VERSION = "1.2.0"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
-PACKAGED_SETTINGS_PATH = Path(__file__).resolve().parents[3] / "settings.json"
+PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 DEFAULT_SETTINGS = {
     "strength": "instagram",
     "variantsPerVideo": 1,
     "separateCopyFolders": True,
     "moveOriginals": False,
+    "processVideos": True,
+    "processPhotos": True,
     "capcutMetadata": False,
     "updateManifestUrl": "",
 }
@@ -44,36 +46,27 @@ ROOT = app_root()
 INPUT_DIR = ROOT / "input"
 OUTPUT_DIR = ROOT / "output"
 VIDEOS_DIR = OUTPUT_DIR / "videos"
+PHOTOS_DIR = OUTPUT_DIR / "photos"
 PROCESSED_DIR = ROOT / "processed"
 FAILED_DIR = ROOT / "failed"
 SETTINGS_PATH = ROOT / "settings.json"
 
 
 def ensure_dirs() -> None:
-    for path in (INPUT_DIR, VIDEOS_DIR, PROCESSED_DIR, FAILED_DIR):
+    for path in (INPUT_DIR, VIDEOS_DIR, PHOTOS_DIR, PROCESSED_DIR, FAILED_DIR):
         path.mkdir(parents=True, exist_ok=True)
 
 
 def load_settings() -> dict:
-    packaged = dict(DEFAULT_SETTINGS)
-    if PACKAGED_SETTINGS_PATH.exists():
-        try:
-            packaged.update(json.loads(PACKAGED_SETTINGS_PATH.read_text(encoding="utf-8")))
-        except Exception:
-            pass
-
     if not SETTINGS_PATH.exists():
-        save_settings(packaged)
-        return packaged
+        save_settings(DEFAULT_SETTINGS)
+        return dict(DEFAULT_SETTINGS)
     try:
         data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
     except Exception:
-        return packaged
-    merged = dict(packaged)
+        return dict(DEFAULT_SETTINGS)
+    merged = dict(DEFAULT_SETTINGS)
     merged.update(data)
-    if not manifest_url(merged) and manifest_url(packaged):
-        merged["updateManifestUrl"] = manifest_url(packaged)
-        save_settings(merged)
     return merged
 
 
@@ -143,6 +136,7 @@ set -eu
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 APP_NAME="{APP_NAME}.app"
+OLD_APP_NAME="@day_xxx Uniquifier.app"
 ZIP_URL={json.dumps(zip_url)}
 VERSION={json.dumps(version)}
 WORK_DIR="$(mktemp -d /tmp/dayxxx_update.XXXXXX)"
@@ -150,6 +144,7 @@ ZIP_PATH="$WORK_DIR/update.zip"
 UNPACK_DIR="$WORK_DIR/unpack"
 DEST_DIR="$HOME/Applications"
 DEST_APP="$DEST_DIR/$APP_NAME"
+OLD_DEST_APP="$DEST_DIR/$OLD_APP_NAME"
 BACKUP_APP="$WORK_DIR/$APP_NAME.backup"
 
 echo "== @day_xxx Uniquifier update $VERSION =="
@@ -172,6 +167,9 @@ DAYXXX_NO_PAUSE=1 sh "$SRC_APP/Contents/Resources/install_dependencies.sh" || tr
 
 echo "Обновляю приложение в $DEST_DIR..."
 mkdir -p "$DEST_DIR"
+if [ -d "$OLD_DEST_APP" ]; then
+  rm -rf "$OLD_DEST_APP"
+fi
 if [ -d "$DEST_APP" ]; then
   mv "$DEST_APP" "$BACKUP_APP"
 fi
@@ -202,11 +200,17 @@ def video_files() -> list[Path]:
     return sorted(path for path in INPUT_DIR.rglob("*") if path.is_file() and path.suffix.lower() in VIDEO_EXTS)
 
 
-def unique_output_dir(input_path: Path, index: int, separate: bool) -> Path:
+def photo_files() -> list[Path]:
+    if not INPUT_DIR.exists():
+        return []
+    return sorted(path for path in INPUT_DIR.rglob("*") if path.is_file() and path.suffix.lower() in PHOTO_EXTS)
+
+
+def unique_output_dir(media_kind: str, index: int, separate: bool) -> Path:
+    base_dir = PHOTOS_DIR if media_kind == "photo" else VIDEOS_DIR
     if separate:
-        safe_stem = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in input_path.stem)
-        return VIDEOS_DIR / f"{safe_stem}_copy_{index:02d}"
-    return VIDEOS_DIR
+        return base_dir / f"copy_{index:02d}"
+    return base_dir
 
 
 class App:
@@ -222,6 +226,8 @@ class App:
         self.variants = IntVar(value=int(self.settings.get("variantsPerVideo", 1)))
         self.separate = BooleanVar(value=bool(self.settings.get("separateCopyFolders", True)))
         self.move_originals = BooleanVar(value=bool(self.settings.get("moveOriginals", False)))
+        self.process_videos = BooleanVar(value=bool(self.settings.get("processVideos", True)))
+        self.process_photos = BooleanVar(value=bool(self.settings.get("processPhotos", True)))
         self.capcut_metadata = BooleanVar(value=bool(self.settings.get("capcutMetadata", False)))
         self.status = StringVar(value="Готово")
         self.running = False
@@ -272,18 +278,25 @@ class App:
         ttk.Checkbutton(controls, text="Копии в отдельные папки", variable=self.separate).grid(
             row=1, column=2, sticky="w", padx=(22, 0)
         )
-        ttk.Checkbutton(controls, text="Переносить оригиналы", variable=self.move_originals).grid(
+        ttk.Checkbutton(controls, text="Удалять оригинал", variable=self.move_originals).grid(
             row=1, column=3, sticky="w", padx=(22, 0)
         )
+        ttk.Checkbutton(controls, text="Видео", variable=self.process_videos).grid(
+            row=2, column=0, sticky="w", pady=(12, 0)
+        )
+        ttk.Checkbutton(controls, text="Фото", variable=self.process_photos).grid(
+            row=2, column=1, sticky="w", padx=(22, 0), pady=(12, 0)
+        )
         ttk.Checkbutton(controls, text="След CapCut в MP4", variable=self.capcut_metadata).grid(
-            row=2, column=0, columnspan=2, sticky="w", pady=(12, 0)
+            row=2, column=2, columnspan=2, sticky="w", padx=(22, 0), pady=(12, 0)
         )
 
         actions = ttk.Frame(outer)
         actions.pack(fill="x", pady=(0, 12))
         ttk.Button(actions, text="Добавить видео", command=self.add_videos).pack(side="left")
+        ttk.Button(actions, text="Добавить фото", command=self.add_photos).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Открыть input", command=lambda: open_path(INPUT_DIR)).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Открыть output", command=lambda: open_path(VIDEOS_DIR)).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Открыть output", command=lambda: open_path(OUTPUT_DIR)).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Проверить обновления", command=self.check_updates).pack(side="left", padx=(8, 0))
         self.run_button = ttk.Button(actions, text="Уникализировать", style="Accent.TButton", command=self.start)
         self.run_button.pack(side="right")
@@ -293,7 +306,7 @@ class App:
 
         files_panel = ttk.Frame(body, style="Panel.TFrame", padding=14)
         files_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
-        ttk.Label(files_panel, text="Видео в input", style="Panel.TLabel", font=("Helvetica", 14, "bold")).pack(anchor="w")
+        ttk.Label(files_panel, text="Файлы в input", style="Panel.TLabel", font=("Helvetica", 14, "bold")).pack(anchor="w")
         self.files_box = ttk.Treeview(files_panel, show="tree", height=12)
         self.files_box.pack(fill="both", expand=True, pady=(10, 0))
         ttk.Button(files_panel, text="Обновить", command=self.refresh_file_list).pack(anchor="w", pady=(10, 0))
@@ -321,16 +334,29 @@ class App:
 
     def refresh_file_list(self) -> None:
         self.files_box.delete(*self.files_box.get_children())
-        files = video_files()
-        for path in files:
-            self.files_box.insert("", "end", text=str(path.relative_to(INPUT_DIR)))
-        self.set_status(f"В input: {len(files)} видео")
+        videos = video_files()
+        photos = photo_files()
+        for path in videos:
+            self.files_box.insert("", "end", text=f"Видео: {path.relative_to(INPUT_DIR)}")
+        for path in photos:
+            self.files_box.insert("", "end", text=f"Фото: {path.relative_to(INPUT_DIR)}")
+        self.set_status(f"В input: {len(videos)} видео, {len(photos)} фото")
 
     def add_videos(self) -> None:
         paths = filedialog.askopenfilenames(
             title="Выбери видео",
             filetypes=(("Video files", "*.mp4 *.mov *.m4v *.avi *.mkv *.webm"), ("All files", "*.*")),
         )
+        self.add_input_files(paths)
+
+    def add_photos(self) -> None:
+        paths = filedialog.askopenfilenames(
+            title="Выбери фото",
+            filetypes=(("Photo files", "*.jpg *.jpeg *.png *.webp *.heic *.heif *.tif *.tiff"), ("All files", "*.*")),
+        )
+        self.add_input_files(paths)
+
+    def add_input_files(self, paths) -> None:
         if not paths:
             return
         INPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -352,6 +378,8 @@ class App:
             "variantsPerVideo": max(1, int(self.variants.get())),
             "separateCopyFolders": bool(self.separate.get()),
             "moveOriginals": bool(self.move_originals.get()),
+            "processVideos": bool(self.process_videos.get()),
+            "processPhotos": bool(self.process_photos.get()),
             "capcutMetadata": bool(self.capcut_metadata.get()),
             "updateManifestUrl": manifest_url(self.settings),
         })
@@ -408,16 +436,17 @@ class App:
             ):
                 install_dependencies_in_terminal()
             return
-        files = video_files()
-        if not files:
-            messagebox.showinfo(APP_NAME, "Положи видео в папку input или нажми Добавить видео.")
+        videos = video_files() if self.process_videos.get() else []
+        photos = photo_files() if self.process_photos.get() else []
+        if not videos and not photos:
+            messagebox.showinfo(APP_NAME, "Положи видео или фото в папку input либо нажми Добавить видео/фото.")
             return
         self.persist_settings()
         self.running = True
         self.run_button.configure(state="disabled")
-        threading.Thread(target=self.process_files, args=(files,), daemon=True).start()
+        threading.Thread(target=self.process_files, args=(videos, photos), daemon=True).start()
 
-    def process_files(self, files: list[Path]) -> None:
+    def process_files(self, videos: list[Path], photos: list[Path]) -> None:
         try:
             total_variants = max(1, int(self.variants.get()))
             strength = self.strength.get()
@@ -426,19 +455,35 @@ class App:
             capcut_metadata = bool(self.capcut_metadata.get())
             self.root.after(0, lambda: self.set_status("Обработка..."))
 
-            for file_index, input_path in enumerate(files, start=1):
-                self.root.after(0, lambda p=input_path, i=file_index: self.log(f"[{i}/{len(files)}] {p.name}"))
-                for copy_index in range(1, total_variants + 1):
-                    out_dir = unique_output_dir(input_path, copy_index, separate)
+            all_inputs = [("video", path) for path in videos] + [("photo", path) for path in photos]
+            for copy_index in range(1, total_variants + 1):
+                if separate:
+                    self.root.after(0, lambda c=copy_index: self.log(f"Папка copy_{c:02d}"))
+                for file_index, (media_kind, input_path) in enumerate(all_inputs, start=1):
+                    label = "видео" if media_kind == "video" else "фото"
+                    self.root.after(
+                        0,
+                        lambda p=input_path, i=file_index, c=copy_index, l=label: self.log(
+                            f"[копия {c}/{total_variants}] [{i}/{len(all_inputs)}] {l}: {p.name}"
+                        ),
+                    )
+                    out_dir = unique_output_dir(media_kind, copy_index, separate)
                     seed = random.SystemRandom().randint(100000, 999999999)
-                    uniquify_engine.uniquify(input_path, out_dir, 1, seed, strength, capcut_metadata)
-                    self.root.after(0, lambda c=copy_index: self.log(f"  копия {c}: готово"))
+                    if media_kind == "video":
+                        uniquify_engine.uniquify(input_path, out_dir, 1, seed, strength, capcut_metadata)
+                    else:
+                        uniquify_engine.uniquify_photo(input_path, out_dir, 1, seed, strength)
 
-                if move_originals:
-                    dst = PROCESSED_DIR / input_path.name
+            if move_originals:
+                moved_dir = PROCESSED_DIR / "deleted_originals"
+                moved_dir.mkdir(parents=True, exist_ok=True)
+                for input_path in [path for _, path in all_inputs]:
+                    if not input_path.exists():
+                        continue
+                    dst = moved_dir / input_path.name
                     suffix = 1
                     while dst.exists():
-                        dst = PROCESSED_DIR / f"{input_path.stem}_{suffix}{input_path.suffix}"
+                        dst = moved_dir / f"{input_path.stem}_{suffix}{input_path.suffix}"
                         suffix += 1
                     shutil.move(str(input_path), str(dst))
 
@@ -451,16 +496,16 @@ class App:
         self.run_button.configure(state="normal")
         self.refresh_file_list()
         self.set_status("Готово")
-        self.log("Готово. Файлы лежат в output/videos.")
+        self.log("Готово. Файлы лежат в output/videos и output/photos.")
         if messagebox.askyesno(APP_NAME, "Готово. Открыть папку с результатами?"):
-            open_path(VIDEOS_DIR)
+            open_path(OUTPUT_DIR)
 
     def fail(self, exc: BaseException) -> None:
         self.running = False
         self.run_button.configure(state="normal")
         self.set_status("Ошибка")
         self.log(f"Ошибка: {exc}")
-        messagebox.showerror(APP_NAME, f"Не удалось обработать видео:\n{exc}")
+        messagebox.showerror(APP_NAME, f"Не удалось обработать файлы:\n{exc}")
 
     def run(self) -> None:
         self.root.mainloop()

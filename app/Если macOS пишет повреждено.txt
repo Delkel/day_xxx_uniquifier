@@ -1,5 +1,5 @@
 Если macOS пишет:
-«Install @day_xxx Uniquifier.command повреждено, и его не удается открыть»
+«Install DuckyBruto Uniq.command повреждено, и его не удается открыть»
 
 Это Gatekeeper/quarantine после скачивания из Telegram, а не ошибка приложения.
 
@@ -13,7 +13,7 @@ xattr -dr com.apple.quarantine
 3. Поставь пробел после команды.
 4. Перетащи распакованную папку day_xxx_uniquifier_macos в окно Terminal.
 5. Нажми Enter.
-6. Снова открой start.command или Install @day_xxx Uniquifier.command.
+6. Снова открой start.command или Install DuckyBruto Uniq.command.
 
 Пример готовой команды:
 
