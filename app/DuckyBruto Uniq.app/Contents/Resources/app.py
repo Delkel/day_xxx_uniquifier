@@ -16,7 +16,7 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.2.2"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
@@ -351,6 +351,8 @@ class App:
             title="Выбери видео",
             filetypes=(("Video files", "*.mp4 *.mov *.m4v *.avi *.mkv *.webm"), ("All files", "*.*")),
         )
+        if paths:
+            self.process_videos.set(True)
         self.add_input_files(paths)
 
     def add_photos(self) -> None:
@@ -358,6 +360,8 @@ class App:
             title="Выбери фото",
             filetypes=(("Photo files", "*.jpg *.jpeg *.png *.webp *.heic *.heif *.tif *.tiff"), ("All files", "*.*")),
         )
+        if paths:
+            self.process_photos.set(True)
         self.add_input_files(paths)
 
     def add_input_files(self, paths) -> None:

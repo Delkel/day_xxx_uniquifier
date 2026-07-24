@@ -1,5 +1,5 @@
 {
-  "version": "1.2.1",
-  "zip_url": "https://github.com/Delkel/day_xxx_uniquifier/releases/download/v1.2.1/duckybruto_uniq_macos_app.zip",
-  "notes": "Новое имя DuckyBruto Uniq, иконка, обработка фото и правильные папки copy_01/copy_02 для комплектов видео и фото."
+  "version": "1.2.2",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
+  "notes": "Фикс добавления фото: если фото добавлено кнопкой, обработка фото включается автоматически."
 }
