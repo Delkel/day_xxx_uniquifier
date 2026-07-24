@@ -16,9 +16,10 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
+UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
 DEFAULT_SETTINGS = {
     "strength": "instagram",
     "variantsPerVideo": 1,
@@ -27,7 +28,7 @@ DEFAULT_SETTINGS = {
     "processVideos": True,
     "processPhotos": True,
     "capcutMetadata": False,
-    "updateManifestUrl": "",
+    "updateManifestUrl": UPDATE_MANIFEST_URL,
 }
 
 
@@ -67,6 +68,9 @@ def load_settings() -> dict:
         return dict(DEFAULT_SETTINGS)
     merged = dict(DEFAULT_SETTINGS)
     merged.update(data)
+    if not str(merged.get("updateManifestUrl") or "").strip():
+        merged["updateManifestUrl"] = UPDATE_MANIFEST_URL
+        save_settings(merged)
     return merged
 
 
