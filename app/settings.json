@@ -10,5 +10,5 @@
   "captionsPerItem": 3,
   "pollSeconds": 5,
   "capcutMetadata": false,
-  "updateManifestUrl": "https://raw.githubusercontent.com/day-xxx/day_xxx_uniquifier/main/update-manifest.json"
+  "updateManifestUrl": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
 }

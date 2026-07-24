@@ -10,12 +10,12 @@
 
 ## После создания репозитория
 
-1. Если репозиторий будет не `day-xxx/day_xxx_uniquifier`, замени owner/repo в `update-manifest.json`.
-2. Если репозиторий будет не `day-xxx/day_xxx_uniquifier`, замени `updateManifestUrl` в `app/settings.json` на raw-ссылку:
+1. Репозиторий настроен под `Delkel/day_xxx_uniquifier`; если он будет другим, замени owner/repo в `update-manifest.json`.
+2. Репозиторий настроен под `Delkel/day_xxx_uniquifier`; если он будет другим, замени `updateManifestUrl` в `app/settings.json` на raw-ссылку:
 
 ```json
 {
-  "updateManifestUrl": "https://raw.githubusercontent.com/day-xxx/day_xxx_uniquifier/main/update-manifest.json"
+  "updateManifestUrl": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
 }
 ```
 
