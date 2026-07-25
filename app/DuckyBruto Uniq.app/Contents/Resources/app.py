@@ -17,7 +17,7 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.3.2"
+APP_VERSION = "1.3.3"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
@@ -281,18 +281,56 @@ class App:
         style.configure("PanelMuted.TLabel", background=colors["surface"], foreground=colors["muted"])
         style.configure("Card.TLabel", background=colors["surface_alt"], foreground=colors["text"])
         style.configure("CardMuted.TLabel", background=colors["surface_alt"], foreground=colors["muted"])
-        style.configure("TButton", padding=(12, 8), borderwidth=1, relief="solid", background="#ffffff", foreground=colors["text"])
+        style.configure(
+            "TButton",
+            padding=(10, 7),
+            borderwidth=1,
+            relief="solid",
+            background="#ffffff",
+            foreground=colors["text"],
+            font=("Helvetica", 11),
+        )
         style.map("TButton", background=[("active", "#f1f7ff")], foreground=[("active", colors["text"])])
         style.configure(
             "Accent.TButton",
-            padding=(24, 12),
+            padding=(18, 11),
             background=colors["accent"],
             foreground="#ffffff",
             borderwidth=0,
             focusthickness=0,
+            font=("Helvetica", 12, "bold"),
         )
         style.map("Accent.TButton", background=[("active", colors["accent_hover"]), ("disabled", "#53606c")])
-        style.configure("Mode.TButton", padding=(18, 8), borderwidth=1, relief="solid", background="#ffffff")
+        style.configure(
+            "Nav.TButton",
+            padding=(8, 7),
+            borderwidth=0,
+            relief="flat",
+            background=colors["surface"],
+            foreground=colors["text"],
+            font=("Helvetica", 10),
+        )
+        style.map("Nav.TButton", background=[("active", "#edf6ff")], foreground=[("active", colors["accent"])])
+        style.configure(
+            "Pill.TButton",
+            padding=(12, 6),
+            borderwidth=1,
+            relief="solid",
+            background="#ffffff",
+            foreground=colors["text"],
+            font=("Helvetica", 10),
+        )
+        style.map("Pill.TButton", background=[("active", "#e8f3ff")], foreground=[("active", colors["accent"])])
+        style.configure(
+            "Small.TButton",
+            padding=(11, 7),
+            borderwidth=1,
+            relief="solid",
+            background="#ffffff",
+            foreground=colors["text"],
+            font=("Helvetica", 10),
+        )
+        style.map("Small.TButton", background=[("active", "#f1f7ff")], foreground=[("active", colors["accent"])])
         style.configure("TCheckbutton", background=colors["surface"], foreground=colors["text"], indicatorcolor="#ffffff")
         style.map("TCheckbutton", background=[("active", colors["surface"])])
         style.configure("TScale", background=colors["surface"], troughcolor="#dce8f4")
@@ -364,7 +402,7 @@ class App:
         ttk.Spinbox(copy_row, from_=1, to=20, textvariable=self.variants, width=5).pack(side="left", padx=(10, 0))
         self.run_button = ttk.Button(settings, text="▶  Старт", style="Accent.TButton", command=self.start)
         self.run_button.grid(row=7, column=0, sticky="ew", pady=(22, 8))
-        ttk.Button(settings, text="↻  Обновить", command=self.refresh_file_list).grid(row=8, column=0, sticky="ew")
+        ttk.Button(settings, text="↻  Обновить", style="Small.TButton", command=self.refresh_file_list).grid(row=8, column=0, sticky="ew")
 
         lower = ttk.Frame(outer, padding=(18, 0, 18, 0), style="TFrame")
         lower.grid(row=3, column=0, sticky="nsew")
@@ -410,8 +448,8 @@ class App:
         self.log_box = self.make_log_box(outer)
 
     def nav_item(self, parent, icon: str, label: str, column: int, command) -> None:
-        button = ttk.Button(parent, text=f"{icon}  {label}", style="Mode.TButton", command=command)
-        button.grid(row=0, column=column, sticky="w", padx=(0, 34), pady=(12, 12))
+        button = ttk.Button(parent, text=f"{icon} {label}", style="Nav.TButton", command=command)
+        button.grid(row=0, column=column, sticky="w", padx=(0, 28), pady=(10, 8))
 
     def draw_drop_zone(self, parent) -> None:
         box = ttk.Frame(parent, style="Card.TFrame", padding=28)
@@ -421,19 +459,19 @@ class App:
         ttk.Label(box, text="Поддерживаются фото и видео\n(JPG, PNG, MP4, MOV)", style="CardMuted.TLabel", justify="center").pack(pady=(8, 14))
         link_row = ttk.Frame(box, style="Card.TFrame")
         link_row.pack()
-        ttk.Button(link_row, text="+ Фото", command=self.add_photos).pack(side="left")
-        ttk.Button(link_row, text="+ Видео", command=self.add_videos).pack(side="left", padx=(8, 0))
-        ttk.Button(link_row, text="Открыть input", command=lambda: open_path(INPUT_DIR)).pack(side="left", padx=(8, 0))
+        ttk.Button(link_row, text="+ Фото", style="Small.TButton", command=self.add_photos).pack(side="left")
+        ttk.Button(link_row, text="+ Видео", style="Small.TButton", command=self.add_videos).pack(side="left", padx=(8, 0))
+        ttk.Button(link_row, text="Открыть input", style="Small.TButton", command=lambda: open_path(INPUT_DIR)).pack(side="left", padx=(8, 0))
 
     def filter_bar(self, parent) -> None:
         bar = ttk.Frame(parent, style="Panel.TFrame")
         bar.pack(fill="x")
-        ttk.Button(bar, text="▧  Фото", command=lambda: self.set_filter("photo")).pack(side="left")
-        ttk.Button(bar, text="▷  Видео", command=lambda: self.set_filter("video")).pack(side="left", padx=(8, 0))
-        ttk.Button(bar, text="▦  Все", command=lambda: self.set_filter("all")).pack(side="left", padx=(8, 0))
-        ttk.Button(bar, text="Output", command=lambda: open_path(OUTPUT_DIR)).pack(side="right")
-        ttk.Button(bar, text="Очистить фото", command=lambda: self.clear_outputs("photo")).pack(side="right", padx=(0, 8))
-        ttk.Button(bar, text="Очистить видео", command=lambda: self.clear_outputs("video")).pack(side="right", padx=(0, 8))
+        ttk.Button(bar, text="▧ Фото", style="Pill.TButton", command=lambda: self.set_filter("photo")).pack(side="left")
+        ttk.Button(bar, text="▷ Видео", style="Pill.TButton", command=lambda: self.set_filter("video")).pack(side="left", padx=(8, 0))
+        ttk.Button(bar, text="▦ Все", style="Pill.TButton", command=lambda: self.set_filter("all")).pack(side="left", padx=(8, 0))
+        ttk.Button(bar, text="Output", style="Small.TButton", command=lambda: open_path(OUTPUT_DIR)).pack(side="right")
+        ttk.Button(bar, text="Очистить фото", style="Small.TButton", command=lambda: self.clear_outputs("photo")).pack(side="right", padx=(0, 8))
+        ttk.Button(bar, text="Очистить видео", style="Small.TButton", command=lambda: self.clear_outputs("video")).pack(side="right", padx=(0, 8))
 
     def preview_card(self, parent, title: str, row: int) -> None:
         ttk.Label(parent, text=title, style="PanelMuted.TLabel", font=("Helvetica", 10, "bold")).grid(row=row * 2 - 1, column=0, sticky="w", pady=(12, 4))
