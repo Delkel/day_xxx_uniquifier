@@ -9,14 +9,15 @@ import threading
 import tempfile
 import urllib.request
 from pathlib import Path
-from tkinter import BooleanVar, IntVar, StringVar, Tk, filedialog, messagebox
+from tkinter import BooleanVar, IntVar, PhotoImage, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
+from typing import Optional
 
 import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
@@ -245,6 +246,9 @@ class App:
         self.output_summary = StringVar(value="0 готовых файлов")
         self.root_dir_summary = StringVar(value=str(ROOT))
         self.running = False
+        self.preview_temp_dir = Path(tempfile.mkdtemp(prefix="dayxxx_preview_"))
+        self.preview_images = {}
+        self.selected_input_path: Optional[Path] = None
 
         self.build_ui()
         self.refresh_file_list()
@@ -376,6 +380,7 @@ class App:
             self.files_box.heading(col, text=title)
             self.files_box.column(col, width=width, anchor="w", stretch=True)
         self.files_box.pack(fill="both", expand=True, pady=(10, 0))
+        self.files_box.bind("<<TreeviewSelect>>", self.on_file_select)
         totals = ttk.Frame(files_panel, style="Panel.TFrame")
         totals.pack(fill="x", pady=(8, 0))
         ttk.Label(totals, textvariable=self.input_summary, style="PanelMuted.TLabel", font=("Helvetica", 10)).pack(side="left")
@@ -434,8 +439,16 @@ class App:
         ttk.Label(parent, text=title, style="PanelMuted.TLabel", font=("Helvetica", 10, "bold")).grid(row=row * 2 - 1, column=0, sticky="w", pady=(12, 4))
         card = ttk.Frame(parent, style="Card.TFrame", padding=18)
         card.grid(row=row * 2, column=0, sticky="ew")
-        ttk.Label(card, text="▶", style="Card.TLabel", foreground="#ffffff", background=self.colors["accent"], font=("Helvetica", 18, "bold")).pack()
-        ttk.Label(card, text="Медиафайл", style="CardMuted.TLabel", font=("Helvetica", 10)).pack(pady=(6, 0))
+        image_label = ttk.Label(card, text="Нет файла", style="CardMuted.TLabel", anchor="center")
+        image_label.pack(fill="both", expand=True)
+        caption = ttk.Label(card, text="Выбери файл в списке", style="CardMuted.TLabel", font=("Helvetica", 10))
+        caption.pack(pady=(6, 0))
+        if title == "До":
+            self.preview_before_image = image_label
+            self.preview_before_caption = caption
+        else:
+            self.preview_after_image = image_label
+            self.preview_after_caption = caption
 
     def stat_card(self, parent, label: str, value_var: StringVar, column: int) -> None:
         card = ttk.Frame(parent, style="Card.TFrame", padding=(14, 12))
@@ -506,13 +519,112 @@ class App:
         videos = video_files()
         photos = photo_files()
         for path in videos:
-            self.files_box.insert("", "end", values=(path.relative_to(INPUT_DIR), "▷ Видео", "Ожидание", self.file_size_label(path)))
+            self.files_box.insert("", "end", iid=str(path), values=(path.relative_to(INPUT_DIR), "▷ Видео", "Ожидание", self.file_size_label(path)))
         for path in photos:
-            self.files_box.insert("", "end", values=(path.relative_to(INPUT_DIR), "▧ Фото", "Ожидание", self.file_size_label(path)))
+            self.files_box.insert("", "end", iid=str(path), values=(path.relative_to(INPUT_DIR), "▧ Фото", "Ожидание", self.file_size_label(path)))
         self.input_summary.set(f"{len(videos)} видео / {len(photos)} фото")
         output_total = count_files(VIDEOS_DIR) + count_files(PHOTOS_DIR)
         self.output_summary.set(f"{output_total} готовых файлов")
         self.set_status(f"В input: {len(videos)} видео, {len(photos)} фото")
+        if self.selected_input_path and self.selected_input_path.exists():
+            self.show_previews(self.selected_input_path)
+        elif videos or photos:
+            first = (videos + photos)[0]
+            self.files_box.selection_set(str(first))
+            self.files_box.focus(str(first))
+            self.show_previews(first)
+        else:
+            self.selected_input_path = None
+            self.clear_previews()
+
+    def on_file_select(self, _event=None) -> None:
+        selection = self.files_box.selection()
+        if not selection:
+            return
+        path = Path(selection[0])
+        if path.exists():
+            self.show_previews(path)
+
+    def show_previews(self, input_path: Path) -> None:
+        self.selected_input_path = input_path
+        before = self.render_preview(input_path, "before")
+        self.set_preview("before", before, input_path.name)
+        output_path = self.find_latest_output(input_path)
+        if output_path:
+            after = self.render_preview(output_path, "after")
+            self.set_preview("after", after, output_path.name)
+        else:
+            self.set_preview("after", None, "После обработки появится тут")
+
+    def clear_previews(self) -> None:
+        self.set_preview("before", None, "Выбери файл в списке")
+        self.set_preview("after", None, "После обработки появится тут")
+
+    def set_preview(self, slot: str, image_path: Optional[Path], caption: str) -> None:
+        image_label = self.preview_before_image if slot == "before" else self.preview_after_image
+        caption_label = self.preview_before_caption if slot == "before" else self.preview_after_caption
+        if not image_path:
+            image_label.configure(image="", text="Нет превью")
+            caption_label.configure(text=caption)
+            self.preview_images.pop(slot, None)
+            return
+        try:
+            image = PhotoImage(file=str(image_path))
+        except BaseException:
+            image_label.configure(image="", text="Не удалось открыть превью")
+            caption_label.configure(text=caption)
+            self.preview_images.pop(slot, None)
+            return
+        self.preview_images[slot] = image
+        image_label.configure(image=image, text="")
+        caption_label.configure(text=caption)
+
+    def render_preview(self, media_path: Path, slot: str) -> Optional[Path]:
+        if not shutil.which("ffmpeg"):
+            return None
+        output_path = self.preview_temp_dir / f"{slot}.png"
+        filters = "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:color=white"
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+        ]
+        if media_path.suffix.lower() in VIDEO_EXTS:
+            cmd += ["-ss", "00:00:00.5"]
+        cmd += [
+            "-i",
+            str(media_path),
+            "-frames:v",
+            "1",
+            "-vf",
+            filters,
+            str(output_path),
+        ]
+        try:
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
+        except BaseException:
+            return None
+        if result.returncode != 0 or not output_path.exists():
+            return None
+        return output_path
+
+    def find_latest_output(self, input_path: Path) -> Optional[Path]:
+        media_kind = "photo" if input_path.suffix.lower() in PHOTO_EXTS else "video"
+        base_dir = PHOTOS_DIR if media_kind == "photo" else VIDEOS_DIR
+        if not base_dir.exists():
+            return None
+        candidates = [
+            path
+            for path in base_dir.rglob("*")
+            if path.is_file()
+            and path.stem.startswith(f"{input_path.stem}_unique_")
+            and path.suffix.lower() in (PHOTO_EXTS if media_kind == "photo" else VIDEO_EXTS)
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda path: path.stat().st_mtime)
 
     def file_size_label(self, path: Path) -> str:
         size = path.stat().st_size
@@ -710,6 +822,8 @@ class App:
         self.running = False
         self.run_button.configure(state="normal")
         self.refresh_file_list()
+        if self.selected_input_path and self.selected_input_path.exists():
+            self.show_previews(self.selected_input_path)
         self.set_status("Готово")
         self.log("Готово. Файлы лежат в output/videos и output/photos.")
         if messagebox.askyesno(APP_NAME, "Готово. Открыть папку с результатами?"):

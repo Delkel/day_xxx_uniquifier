@@ -1,5 +1,5 @@
 {
-  "version": "1.3.1",
+  "version": "1.3.2",
   "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
-  "notes": "Дизайн по светлому референсу: верхние вкладки Files/Photo/Video/Update/Settings, большая зона добавления файлов, панель силы уникализации, очередь файлов и превью."
+  "notes": "Исправлено превью: при выборе файла показывается кадр до обработки, а после обработки автоматически подтягивается готовый результат."
 }
