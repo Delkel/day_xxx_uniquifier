@@ -1,5 +1,5 @@
 {
-  "version": "1.2.3",
+  "version": "1.2.4",
   "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
-  "notes": "Фикс режима без галочек: если «Видео» и «Фото» выключены, приложение обрабатывает всё, что лежит в input."
+  "notes": "Новый тёмный интерфейсный шаг: добавлены отдельные кнопки очистки готовых видео и готовых фото. Исходники в input не удаляются."
 }

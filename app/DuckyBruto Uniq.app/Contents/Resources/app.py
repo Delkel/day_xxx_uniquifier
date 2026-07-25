@@ -16,7 +16,7 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.2.3"
+APP_VERSION = "1.2.4"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
@@ -217,6 +217,12 @@ def unique_output_dir(media_kind: str, index: int, separate: bool) -> Path:
     return base_dir
 
 
+def count_files(path: Path) -> int:
+    if not path.exists():
+        return 0
+    return sum(1 for item in path.rglob("*") if item.is_file())
+
+
 class App:
     def __init__(self) -> None:
         ensure_dirs()
@@ -301,6 +307,8 @@ class App:
         ttk.Button(actions, text="Добавить фото", command=self.add_photos).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Открыть input", command=lambda: open_path(INPUT_DIR)).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Открыть output", command=lambda: open_path(OUTPUT_DIR)).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Очистить видео", command=lambda: self.clear_outputs("video")).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Очистить фото", command=lambda: self.clear_outputs("photo")).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Проверить обновления", command=self.check_updates).pack(side="left", padx=(8, 0))
         self.run_button = ttk.Button(actions, text="Уникализировать", style="Accent.TButton", command=self.start)
         self.run_button.pack(side="right")
@@ -378,6 +386,34 @@ class App:
             shutil.copy2(src, dst)
             self.log(f"Добавлено: {dst.name}")
         self.refresh_file_list()
+
+    def clear_outputs(self, media_kind: str) -> None:
+        if self.running:
+            messagebox.showinfo(APP_NAME, "Сначала дождись окончания обработки.")
+            return
+
+        if media_kind == "photo":
+            target_dir = PHOTOS_DIR
+            label = "готовые фото"
+        else:
+            target_dir = VIDEOS_DIR
+            label = "готовые видео"
+
+        total = count_files(target_dir)
+        if total == 0:
+            messagebox.showinfo(APP_NAME, f"В папке с результатами нет файлов: {label}.")
+            return
+
+        if not messagebox.askyesno(
+            APP_NAME,
+            f"Удалить все {label}?\n\nБудет очищена только папка:\n{target_dir}\n\nИсходники в input не трогаю.",
+        ):
+            return
+
+        shutil.rmtree(target_dir, ignore_errors=True)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        self.log(f"Очищено: {label} ({total} файлов)")
+        self.set_status("Результаты очищены")
 
     def persist_settings(self) -> None:
         settings = dict(self.settings)
