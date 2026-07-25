@@ -16,7 +16,7 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.2.3"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
@@ -444,8 +444,11 @@ class App:
             ):
                 install_dependencies_in_terminal()
             return
-        videos = video_files() if self.process_videos.get() else []
-        photos = photo_files() if self.process_photos.get() else []
+        selected_videos = bool(self.process_videos.get())
+        selected_photos = bool(self.process_photos.get())
+        process_all = not selected_videos and not selected_photos
+        videos = video_files() if process_all or selected_videos else []
+        photos = photo_files() if process_all or selected_photos else []
         if not videos and not photos:
             messagebox.showinfo(APP_NAME, "Положи видео или фото в папку input либо нажми Добавить видео/фото.")
             return
