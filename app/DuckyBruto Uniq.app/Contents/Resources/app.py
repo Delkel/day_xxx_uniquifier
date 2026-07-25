@@ -16,7 +16,7 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
@@ -239,6 +239,7 @@ class App:
         self.process_videos = BooleanVar(value=bool(self.settings.get("processVideos", True)))
         self.process_photos = BooleanVar(value=bool(self.settings.get("processPhotos", True)))
         self.capcut_metadata = BooleanVar(value=bool(self.settings.get("capcutMetadata", False)))
+        self.strength_percent = IntVar(value=self.percent_from_strength(self.strength.get()))
         self.status = StringVar(value="Готово")
         self.input_summary = StringVar(value="0 видео / 0 фото")
         self.output_summary = StringVar(value="0 готовых файлов")
@@ -252,16 +253,19 @@ class App:
         style = ttk.Style()
         style.theme_use("clam")
         colors = {
-            "bg": "#0b0f14",
-            "surface": "#141b24",
-            "surface_alt": "#182231",
-            "line": "#263241",
-            "text": "#edf3f8",
-            "muted": "#94a3b8",
-            "accent": "#3ddc97",
-            "accent_hover": "#33bf84",
-            "warning": "#f6c453",
+            "bg": "#f4f8fc",
+            "surface": "#ffffff",
+            "surface_alt": "#f8fbff",
+            "line": "#d8e3ee",
+            "soft_line": "#e9eff6",
+            "text": "#253044",
+            "muted": "#7b8797",
+            "accent": "#1683f7",
+            "accent_hover": "#0d6fd8",
+            "green": "#2eb85c",
+            "purple": "#7e57d9",
         }
+        self.colors = colors
 
         style.configure(".", font=("Helvetica", 12))
         style.configure("TFrame", background=colors["bg"])
@@ -273,121 +277,165 @@ class App:
         style.configure("PanelMuted.TLabel", background=colors["surface"], foreground=colors["muted"])
         style.configure("Card.TLabel", background=colors["surface_alt"], foreground=colors["text"])
         style.configure("CardMuted.TLabel", background=colors["surface_alt"], foreground=colors["muted"])
-        style.configure("TButton", padding=(12, 8), borderwidth=0, focusthickness=0)
-        style.map("TButton", background=[("active", colors["surface_alt"])])
+        style.configure("TButton", padding=(12, 8), borderwidth=1, relief="solid", background="#ffffff", foreground=colors["text"])
+        style.map("TButton", background=[("active", "#f1f7ff")], foreground=[("active", colors["text"])])
         style.configure(
             "Accent.TButton",
-            padding=(16, 10),
+            padding=(24, 12),
             background=colors["accent"],
-            foreground="#06110c",
+            foreground="#ffffff",
             borderwidth=0,
             focusthickness=0,
         )
         style.map("Accent.TButton", background=[("active", colors["accent_hover"]), ("disabled", "#53606c")])
-        style.configure("TCheckbutton", background=colors["surface"], foreground=colors["text"])
+        style.configure("Mode.TButton", padding=(18, 8), borderwidth=1, relief="solid", background="#ffffff")
+        style.configure("TCheckbutton", background=colors["surface"], foreground=colors["text"], indicatorcolor="#ffffff")
         style.map("TCheckbutton", background=[("active", colors["surface"])])
-        style.configure("TCombobox", fieldbackground="#0f151d", background="#0f151d", foreground=colors["text"])
-        style.configure("TSpinbox", fieldbackground="#0f151d", background="#0f151d", foreground=colors["text"])
+        style.configure("TScale", background=colors["surface"], troughcolor="#dce8f4")
+        style.configure("TSpinbox", fieldbackground="#ffffff", background="#ffffff", foreground=colors["text"])
         style.configure(
             "Treeview",
-            background="#0f151d",
-            fieldbackground="#0f151d",
+            background="#ffffff",
+            fieldbackground="#ffffff",
             foreground=colors["text"],
-            bordercolor=colors["line"],
-            rowheight=28,
+            bordercolor=colors["soft_line"],
+            rowheight=38,
         )
-        style.map("Treeview", background=[("selected", "#224238")], foreground=[("selected", colors["text"])])
+        style.configure("Treeview.Heading", background="#f8fbff", foreground=colors["muted"], font=("Helvetica", 10))
+        style.map("Treeview", background=[("selected", "#e8f3ff")], foreground=[("selected", colors["text"])])
 
         self.root.configure(bg=colors["bg"])
+        self.root.minsize(1040, 680)
 
-        outer = ttk.Frame(self.root, padding=24)
+        outer = ttk.Frame(self.root, padding=0, style="TFrame")
         outer.pack(fill="both", expand=True)
         outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(4, weight=1)
+        outer.rowconfigure(3, weight=1)
 
-        header = ttk.Frame(outer)
-        header.grid(row=0, column=0, sticky="ew")
-        header.columnconfigure(1, weight=1)
-        ttk.Label(header, text=APP_NAME, font=("Helvetica", 28, "bold")).grid(row=0, column=0, sticky="w")
-        ttk.Label(header, text=f"v{APP_VERSION}", style="Muted.TLabel").grid(row=0, column=1, sticky="w", padx=(12, 0))
-        status_badge = ttk.Frame(header, style="Card.TFrame", padding=(12, 7))
-        status_badge.grid(row=0, column=2, sticky="e")
-        ttk.Label(status_badge, textvariable=self.status, style="CardMuted.TLabel").pack()
+        titlebar = ttk.Frame(outer, style="Panel.TFrame", padding=(18, 12))
+        titlebar.grid(row=0, column=0, sticky="ew")
+        titlebar.columnconfigure(1, weight=1)
+        ttk.Label(titlebar, text="◉", style="Panel.TLabel", foreground=colors["accent"], font=("Helvetica", 17, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(titlebar, text="@day_xxx Uniquifier", style="Panel.TLabel", font=("Helvetica", 13, "bold")).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        ttk.Label(titlebar, text="—    □    ×", style="PanelMuted.TLabel", font=("Helvetica", 13)).grid(row=0, column=2, sticky="e")
 
-        stats = ttk.Frame(outer)
-        stats.grid(row=1, column=0, sticky="ew", pady=(18, 12))
-        stats.columnconfigure((0, 1, 2), weight=1, uniform="stats")
-        self.stat_card(stats, "Вход", self.input_summary, 0)
-        self.stat_card(stats, "Результаты", self.output_summary, 1)
-        self.stat_card(stats, "Папка", self.root_dir_summary, 2)
+        nav = ttk.Frame(outer, style="Panel.TFrame", padding=(28, 0, 28, 0))
+        nav.grid(row=1, column=0, sticky="ew")
+        for index, (icon, label, command) in enumerate((
+            ("📁", "Files", self.refresh_file_list),
+            ("▧", "Photo", lambda: self.set_filter("photo")),
+            ("▷", "Video", lambda: self.set_filter("video")),
+            ("↻", "Update", self.check_updates),
+            ("⚙", "Settings", lambda: open_path(ROOT)),
+        )):
+            self.nav_item(nav, icon, label, index, command)
 
-        controls = ttk.Frame(outer, style="Panel.TFrame", padding=18)
-        controls.grid(row=2, column=0, sticky="ew", pady=(0, 14))
-        controls.columnconfigure(4, weight=1)
+        content = ttk.Frame(outer, padding=18, style="TFrame")
+        content.grid(row=2, column=0, sticky="nsew")
+        content.columnconfigure(0, weight=3, uniform="top")
+        content.columnconfigure(1, weight=2, uniform="top")
+        content.rowconfigure(0, weight=0)
 
-        ttk.Label(controls, text="Настройки обработки", style="Panel.TLabel", font=("Helvetica", 15, "bold")).grid(
-            row=0, column=0, columnspan=5, sticky="w"
-        )
-        ttk.Label(controls, text="Режим", style="PanelMuted.TLabel").grid(row=1, column=0, sticky="w", pady=(14, 0))
-        mode_box = ttk.Combobox(
-            controls,
-            textvariable=self.strength,
-            values=("light", "normal", "strong", "instagram"),
-            state="readonly",
-            width=16,
-        )
-        mode_box.grid(row=2, column=0, sticky="w", pady=(6, 0))
+        drop = ttk.Frame(content, style="Panel.TFrame", padding=18)
+        drop.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.draw_drop_zone(drop)
 
-        ttk.Label(controls, text="Копий", style="PanelMuted.TLabel").grid(row=1, column=1, sticky="w", padx=(22, 0), pady=(14, 0))
-        ttk.Spinbox(controls, from_=1, to=20, textvariable=self.variants, width=8).grid(
-            row=2, column=1, sticky="w", padx=(22, 0), pady=(6, 0)
-        )
+        settings = ttk.Frame(content, style="Panel.TFrame", padding=22)
+        settings.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        settings.columnconfigure(0, weight=1)
+        ttk.Label(settings, text="Сила уникализации  ⓘ", style="Panel.TLabel", font=("Helvetica", 12, "bold")).grid(row=0, column=0, sticky="w")
+        scale_row = ttk.Frame(settings, style="Panel.TFrame")
+        scale_row.grid(row=1, column=0, sticky="ew", pady=(10, 2))
+        scale_row.columnconfigure(0, weight=1)
+        ttk.Scale(scale_row, from_=25, to=100, variable=self.strength_percent, command=self.on_strength_change).grid(row=0, column=0, sticky="ew")
+        self.strength_label = ttk.Label(scale_row, text=f"{self.strength_percent.get()}%", style="Panel.TLabel", foreground=colors["accent"], font=("Helvetica", 12, "bold"))
+        self.strength_label.grid(row=0, column=1, sticky="e", padx=(12, 0))
+        ttk.Label(settings, text="Нормальная (рекомендуется)", style="PanelMuted.TLabel", font=("Helvetica", 10)).grid(row=2, column=0, sticky="w")
+        ttk.Checkbutton(settings, text="Обрабатывать все медиафайлы", variable=self.process_all_var(), command=self.toggle_all_media).grid(row=3, column=0, sticky="w", pady=(20, 0))
+        ttk.Label(settings, text="Если не выбран фильтр, будут обработаны фото и видео", style="PanelMuted.TLabel", font=("Helvetica", 10)).grid(row=4, column=0, sticky="w", padx=(24, 0), pady=(2, 0))
+        ttk.Checkbutton(settings, text="Копии в отдельные папки", variable=self.separate).grid(row=5, column=0, sticky="w", pady=(14, 0))
+        copy_row = ttk.Frame(settings, style="Panel.TFrame")
+        copy_row.grid(row=6, column=0, sticky="w", pady=(12, 0))
+        ttk.Label(copy_row, text="Копий", style="PanelMuted.TLabel").pack(side="left")
+        ttk.Spinbox(copy_row, from_=1, to=20, textvariable=self.variants, width=5).pack(side="left", padx=(10, 0))
+        self.run_button = ttk.Button(settings, text="▶  Старт", style="Accent.TButton", command=self.start)
+        self.run_button.grid(row=7, column=0, sticky="ew", pady=(22, 8))
+        ttk.Button(settings, text="↻  Обновить", command=self.refresh_file_list).grid(row=8, column=0, sticky="ew")
 
-        ttk.Checkbutton(controls, text="Копии в отдельные папки", variable=self.separate).grid(
-            row=2, column=2, sticky="w", padx=(22, 0)
-        )
-        ttk.Checkbutton(controls, text="Удалять оригинал", variable=self.move_originals).grid(
-            row=2, column=3, sticky="w", padx=(22, 0)
-        )
-        ttk.Checkbutton(controls, text="Видео", variable=self.process_videos).grid(
-            row=3, column=0, sticky="w", pady=(14, 0)
-        )
-        ttk.Checkbutton(controls, text="Фото", variable=self.process_photos).grid(
-            row=3, column=1, sticky="w", padx=(22, 0), pady=(14, 0)
-        )
-        ttk.Checkbutton(controls, text="След CapCut в MP4", variable=self.capcut_metadata).grid(
-            row=3, column=2, columnspan=2, sticky="w", padx=(22, 0), pady=(14, 0)
-        )
+        lower = ttk.Frame(outer, padding=(18, 0, 18, 0), style="TFrame")
+        lower.grid(row=3, column=0, sticky="nsew")
+        lower.columnconfigure(0, weight=3, uniform="lower")
+        lower.columnconfigure(1, weight=1, uniform="lower")
+        lower.rowconfigure(0, weight=1)
 
-        actions = ttk.Frame(outer)
-        actions.grid(row=3, column=0, sticky="ew", pady=(0, 14))
-        ttk.Button(actions, text="+ Видео", command=self.add_videos).pack(side="left")
-        ttk.Button(actions, text="+ Фото", command=self.add_photos).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Input", command=lambda: open_path(INPUT_DIR)).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Output", command=lambda: open_path(OUTPUT_DIR)).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Очистить видео", command=lambda: self.clear_outputs("video")).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Очистить фото", command=lambda: self.clear_outputs("photo")).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Обновления", command=self.check_updates).pack(side="left", padx=(8, 0))
-        self.run_button = ttk.Button(actions, text="Уникализировать", style="Accent.TButton", command=self.start)
-        self.run_button.pack(side="right")
-
-        body = ttk.Frame(outer)
-        body.grid(row=4, column=0, sticky="nsew")
-        body.columnconfigure((0, 1), weight=1, uniform="body")
-        body.rowconfigure(0, weight=1)
-
-        files_panel = ttk.Frame(body, style="Panel.TFrame", padding=14)
-        files_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        ttk.Label(files_panel, text="Файлы в input", style="Panel.TLabel", font=("Helvetica", 14, "bold")).pack(anchor="w")
-        self.files_box = ttk.Treeview(files_panel, show="tree", height=12)
+        files_panel = ttk.Frame(lower, style="Panel.TFrame", padding=12)
+        files_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.filter_bar(files_panel)
+        self.files_box = ttk.Treeview(files_panel, columns=("name", "type", "status", "size"), show="headings", height=7)
+        for col, title, width in (("name", "Имя файла", 280), ("type", "Тип", 110), ("status", "Статус", 150), ("size", "Размер", 110)):
+            self.files_box.heading(col, text=title)
+            self.files_box.column(col, width=width, anchor="w", stretch=True)
         self.files_box.pack(fill="both", expand=True, pady=(10, 0))
-        ttk.Button(files_panel, text="Обновить", command=self.refresh_file_list).pack(anchor="w", pady=(10, 0))
+        totals = ttk.Frame(files_panel, style="Panel.TFrame")
+        totals.pack(fill="x", pady=(8, 0))
+        ttk.Label(totals, textvariable=self.input_summary, style="PanelMuted.TLabel", font=("Helvetica", 10)).pack(side="left")
+        ttk.Label(totals, textvariable=self.output_summary, style="PanelMuted.TLabel", font=("Helvetica", 10)).pack(side="right")
 
-        log_panel = ttk.Frame(body, style="Panel.TFrame", padding=14)
-        log_panel.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
-        ttk.Label(log_panel, text="Лог", style="Panel.TLabel", font=("Helvetica", 14, "bold")).pack(anchor="w")
-        self.log_box = self.make_log_box(log_panel)
-        self.log_box.pack(fill="both", expand=True, pady=(10, 0))
+        preview = ttk.Frame(lower, style="Panel.TFrame", padding=14)
+        preview.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        preview.columnconfigure(0, weight=1)
+        ttk.Label(preview, text="Превью", style="Panel.TLabel", font=("Helvetica", 13, "bold")).grid(row=0, column=0, sticky="w")
+        self.preview_card(preview, "До", 1)
+        self.preview_card(preview, "После", 2)
+        playbar = ttk.Frame(preview, style="Panel.TFrame")
+        playbar.grid(row=3, column=0, sticky="ew", pady=(10, 0))
+        playbar.columnconfigure(1, weight=1)
+        ttk.Label(playbar, text="▶", style="Panel.TLabel", foreground=colors["accent"], font=("Helvetica", 13, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(playbar, text="00:00 / 00:12", style="PanelMuted.TLabel", font=("Helvetica", 9)).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        ttk.Label(playbar, text="🔊", style="Panel.TLabel").grid(row=0, column=2, sticky="e")
+
+        footer = ttk.Frame(outer, style="Panel.TFrame", padding=(18, 10))
+        footer.grid(row=4, column=0, sticky="ew")
+        footer.columnconfigure(1, weight=1)
+        ttk.Label(footer, text="●", style="Panel.TLabel", foreground=colors["green"], font=("Helvetica", 12, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(footer, textvariable=self.status, style="PanelMuted.TLabel").grid(row=0, column=1, sticky="w", padx=(8, 0))
+        ttk.Label(footer, text=f"Версия {APP_VERSION}", style="PanelMuted.TLabel").grid(row=0, column=2, sticky="e", padx=(0, 18))
+        ttk.Label(footer, text="GitHub update ready", style="Panel.TLabel", foreground=colors["green"], font=("Helvetica", 11, "bold")).grid(row=0, column=3, sticky="e")
+
+        self.log_box = self.make_log_box(outer)
+
+    def nav_item(self, parent, icon: str, label: str, column: int, command) -> None:
+        button = ttk.Button(parent, text=f"{icon}  {label}", style="Mode.TButton", command=command)
+        button.grid(row=0, column=column, sticky="w", padx=(0, 34), pady=(12, 12))
+
+    def draw_drop_zone(self, parent) -> None:
+        box = ttk.Frame(parent, style="Card.TFrame", padding=28)
+        box.pack(fill="both", expand=True)
+        ttk.Label(box, text="☁", style="Card.TLabel", foreground=self.colors["accent"], font=("Helvetica", 52)).pack(pady=(8, 4))
+        ttk.Label(box, text="Перетащите файлы сюда", style="Card.TLabel", font=("Helvetica", 16, "bold")).pack()
+        ttk.Label(box, text="Поддерживаются фото и видео\n(JPG, PNG, MP4, MOV)", style="CardMuted.TLabel", justify="center").pack(pady=(8, 14))
+        link_row = ttk.Frame(box, style="Card.TFrame")
+        link_row.pack()
+        ttk.Button(link_row, text="+ Фото", command=self.add_photos).pack(side="left")
+        ttk.Button(link_row, text="+ Видео", command=self.add_videos).pack(side="left", padx=(8, 0))
+        ttk.Button(link_row, text="Открыть input", command=lambda: open_path(INPUT_DIR)).pack(side="left", padx=(8, 0))
+
+    def filter_bar(self, parent) -> None:
+        bar = ttk.Frame(parent, style="Panel.TFrame")
+        bar.pack(fill="x")
+        ttk.Button(bar, text="▧  Фото", command=lambda: self.set_filter("photo")).pack(side="left")
+        ttk.Button(bar, text="▷  Видео", command=lambda: self.set_filter("video")).pack(side="left", padx=(8, 0))
+        ttk.Button(bar, text="▦  Все", command=lambda: self.set_filter("all")).pack(side="left", padx=(8, 0))
+        ttk.Button(bar, text="Output", command=lambda: open_path(OUTPUT_DIR)).pack(side="right")
+        ttk.Button(bar, text="Очистить фото", command=lambda: self.clear_outputs("photo")).pack(side="right", padx=(0, 8))
+        ttk.Button(bar, text="Очистить видео", command=lambda: self.clear_outputs("video")).pack(side="right", padx=(0, 8))
+
+    def preview_card(self, parent, title: str, row: int) -> None:
+        ttk.Label(parent, text=title, style="PanelMuted.TLabel", font=("Helvetica", 10, "bold")).grid(row=row * 2 - 1, column=0, sticky="w", pady=(12, 4))
+        card = ttk.Frame(parent, style="Card.TFrame", padding=18)
+        card.grid(row=row * 2, column=0, sticky="ew")
+        ttk.Label(card, text="▶", style="Card.TLabel", foreground="#ffffff", background=self.colors["accent"], font=("Helvetica", 18, "bold")).pack()
+        ttk.Label(card, text="Медиафайл", style="CardMuted.TLabel", font=("Helvetica", 10)).pack(pady=(6, 0))
 
     def stat_card(self, parent, label: str, value_var: StringVar, column: int) -> None:
         card = ttk.Frame(parent, style="Card.TFrame", padding=(14, 12))
@@ -398,9 +446,52 @@ class App:
     def make_log_box(self, parent):
         from tkinter import Text
 
-        box = Text(parent, wrap="word", height=12, bg="#0f151d", fg="#edf3f8", insertbackground="#edf3f8", relief="flat")
-        box.configure(font=("Menlo", 11))
+        box = Text(parent, wrap="word", height=3, bg="#ffffff", fg="#253044", insertbackground="#253044", relief="flat")
+        box.configure(font=("Menlo", 10))
         return box
+
+    def process_all_var(self):
+        self._process_all = BooleanVar(value=bool(self.process_videos.get() and self.process_photos.get()))
+        return self._process_all
+
+    def toggle_all_media(self) -> None:
+        value = bool(self._process_all.get())
+        self.process_videos.set(value)
+        self.process_photos.set(value)
+
+    def set_filter(self, value: str) -> None:
+        if value == "photo":
+            self.process_photos.set(True)
+            self.process_videos.set(False)
+        elif value == "video":
+            self.process_photos.set(False)
+            self.process_videos.set(True)
+        else:
+            self.process_photos.set(True)
+            self.process_videos.set(True)
+        if hasattr(self, "_process_all"):
+            self._process_all.set(bool(self.process_videos.get() and self.process_photos.get()))
+        self.refresh_file_list()
+
+    def percent_from_strength(self, value: str) -> int:
+        return {"light": 35, "normal": 55, "strong": 75, "instagram": 75}.get(value, 75)
+
+    def strength_from_percent(self) -> str:
+        value = int(self.strength_percent.get())
+        if value < 45:
+            return "light"
+        if value < 65:
+            return "normal"
+        if value < 85:
+            return "strong"
+        return "instagram"
+
+    def on_strength_change(self, _value=None) -> None:
+        value = int(float(self.strength_percent.get()))
+        self.strength_percent.set(value)
+        self.strength.set(self.strength_from_percent())
+        if hasattr(self, "strength_label"):
+            self.strength_label.configure(text=f"{value}%")
 
     def log(self, text: str) -> None:
         self.log_box.insert("end", text + "\n")
@@ -415,13 +506,21 @@ class App:
         videos = video_files()
         photos = photo_files()
         for path in videos:
-            self.files_box.insert("", "end", text=f"Видео: {path.relative_to(INPUT_DIR)}")
+            self.files_box.insert("", "end", values=(path.relative_to(INPUT_DIR), "▷ Видео", "Ожидание", self.file_size_label(path)))
         for path in photos:
-            self.files_box.insert("", "end", text=f"Фото: {path.relative_to(INPUT_DIR)}")
+            self.files_box.insert("", "end", values=(path.relative_to(INPUT_DIR), "▧ Фото", "Ожидание", self.file_size_label(path)))
         self.input_summary.set(f"{len(videos)} видео / {len(photos)} фото")
         output_total = count_files(VIDEOS_DIR) + count_files(PHOTOS_DIR)
         self.output_summary.set(f"{output_total} готовых файлов")
         self.set_status(f"В input: {len(videos)} видео, {len(photos)} фото")
+
+    def file_size_label(self, path: Path) -> str:
+        size = path.stat().st_size
+        if size >= 1024 * 1024:
+            return f"{size / 1024 / 1024:.1f} MB"
+        if size >= 1024:
+            return f"{size / 1024:.1f} KB"
+        return f"{size} B"
 
     def add_videos(self) -> None:
         paths = filedialog.askopenfilenames(
