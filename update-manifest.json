@@ -1,5 +1,5 @@
 {
-  "version": "1.2.4",
+  "version": "1.3.0",
   "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
-  "notes": "Новый тёмный интерфейсный шаг: добавлены отдельные кнопки очистки готовых видео и готовых фото. Исходники в input не удаляются."
+  "notes": "Новый дизайн DuckyBruto Uniq: верхняя панель со статусом, счетчики входных и готовых файлов, обновленная темная компоновка настроек, действий, списка файлов и лога."
 }
