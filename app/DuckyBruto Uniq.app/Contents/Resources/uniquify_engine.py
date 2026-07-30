@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+from datetime import datetime, timedelta, timezone
 import json
 import random
 import shutil
@@ -153,22 +154,54 @@ def photo_output_name(input_path: Path, index: int, seed: int) -> str:
     return f"{input_path.stem}_unique_{index:02d}_seed{seed}.jpg"
 
 
-def capcut_metadata_args() -> list[str]:
+def iphone_capcut_metadata_args(rng: random.Random) -> list[str]:
+    created_at = datetime.now(timezone.utc) - timedelta(
+        days=rng.randint(1, 180),
+        seconds=rng.randint(0, 86399),
+    )
+    creation_time = created_at.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    ios_version = rng.choice(["14.8", "15.7.9", "16.7.10"])
+    capcut_version = rng.choice(["12.8.0", "12.9.0", "13.0.0", "13.1.0"])
+
     return [
         "-brand",
         "mp42",
         "-metadata",
-        "title=CapCut",
+        "major_brand=mp42",
         "-metadata",
-        "encoder=CapCut",
+        "minor_version=0",
         "-metadata",
-        "software=CapCut",
+        "compatible_brands=mp42isomavc1",
+        "-metadata",
+        f"creation_time={creation_time}",
+        "-metadata",
+        "make=Apple",
+        "-metadata",
+        "model=iPhone 11",
+        "-metadata",
+        "com.apple.quicktime.make=Apple",
+        "-metadata",
+        "com.apple.quicktime.model=iPhone 11",
+        "-metadata",
+        f"com.apple.quicktime.creationdate={creation_time}",
+        "-metadata",
+        f"com.apple.quicktime.software=iOS {ios_version}",
+        "-metadata",
+        f"title=CapCut {capcut_version}",
+        "-metadata",
+        f"encoder=CapCut {capcut_version}",
+        "-metadata",
+        f"software=CapCut {capcut_version}",
         "-metadata",
         "com.apple.quicktime.software=CapCut",
         "-metadata",
         "comment=Edited with CapCut",
         "-metadata:s:v:0",
+        f"creation_time={creation_time}",
+        "-metadata:s:v:0",
         "handler_name=CapCut Video Media Handler",
+        "-metadata:s:a:0",
+        f"creation_time={creation_time}",
         "-metadata:s:a:0",
         "handler_name=CapCut Audio Media Handler",
     ]
@@ -226,7 +259,7 @@ def uniquify(
             "-1",
         ]
         if capcut_metadata:
-            cmd += capcut_metadata_args()
+            cmd += iphone_capcut_metadata_args(rng)
         cmd += [
             "-c:v",
             "libx264",
@@ -339,7 +372,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-n", "--count", type=int, default=1, help="Number of variants to create")
     parser.add_argument("--seed", type=int, default=None, help="Base seed for repeatable output")
     parser.add_argument("--strength", choices=sorted(STRENGTHS), default="normal", help="Transformation strength")
-    parser.add_argument("--capcut-metadata", action="store_true", help="Add CapCut-like MP4 metadata tags")
+    parser.add_argument("--capcut-metadata", action="store_true", help="Add randomized iPhone 11 + CapCut MP4 metadata tags")
     return parser.parse_args()
 
 

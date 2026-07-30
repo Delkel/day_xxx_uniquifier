@@ -17,7 +17,7 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.3.3"
+APP_VERSION = "1.3.4"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
@@ -396,13 +396,14 @@ class App:
         ttk.Checkbutton(settings, text="Обрабатывать все медиафайлы", variable=self.process_all_var(), command=self.toggle_all_media).grid(row=3, column=0, sticky="w", pady=(20, 0))
         ttk.Label(settings, text="Если не выбран фильтр, будут обработаны фото и видео", style="PanelMuted.TLabel", font=("Helvetica", 10)).grid(row=4, column=0, sticky="w", padx=(24, 0), pady=(2, 0))
         ttk.Checkbutton(settings, text="Копии в отдельные папки", variable=self.separate).grid(row=5, column=0, sticky="w", pady=(14, 0))
+        ttk.Checkbutton(settings, text="iPhone 11 + CapCut метаданные", variable=self.capcut_metadata).grid(row=6, column=0, sticky="w", pady=(14, 0))
         copy_row = ttk.Frame(settings, style="Panel.TFrame")
-        copy_row.grid(row=6, column=0, sticky="w", pady=(12, 0))
+        copy_row.grid(row=7, column=0, sticky="w", pady=(12, 0))
         ttk.Label(copy_row, text="Копий", style="PanelMuted.TLabel").pack(side="left")
         ttk.Spinbox(copy_row, from_=1, to=20, textvariable=self.variants, width=5).pack(side="left", padx=(10, 0))
         self.run_button = ttk.Button(settings, text="▶  Старт", style="Accent.TButton", command=self.start)
-        self.run_button.grid(row=7, column=0, sticky="ew", pady=(22, 8))
-        ttk.Button(settings, text="↻  Обновить", style="Small.TButton", command=self.refresh_file_list).grid(row=8, column=0, sticky="ew")
+        self.run_button.grid(row=8, column=0, sticky="ew", pady=(22, 8))
+        ttk.Button(settings, text="↻  Обновить", style="Small.TButton", command=self.refresh_file_list).grid(row=9, column=0, sticky="ew")
 
         lower = ttk.Frame(outer, padding=(18, 0, 18, 0), style="TFrame")
         lower.grid(row=3, column=0, sticky="nsew")
