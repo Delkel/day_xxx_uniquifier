@@ -9,7 +9,7 @@ import threading
 import tempfile
 import urllib.request
 from pathlib import Path
-from tkinter import BooleanVar, IntVar, PhotoImage, StringVar, Tk, filedialog, messagebox
+from tkinter import BooleanVar, Canvas, IntVar, PhotoImage, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
 from typing import Optional
 
@@ -17,7 +17,7 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
@@ -89,6 +89,10 @@ def open_path(path: Path) -> None:
 
 def dependency_installer() -> Path:
     return Path(__file__).resolve().with_name("install_dependencies.sh")
+
+
+def cover_image_path() -> Path:
+    return Path(__file__).resolve().with_name("DuckyBrutoCover.png")
 
 
 def install_dependencies_in_terminal() -> None:
@@ -251,10 +255,20 @@ class App:
         self.progress_text = StringVar(value="0%")
         self.preview_temp_dir = Path(tempfile.mkdtemp(prefix="dayxxx_preview_"))
         self.preview_images = {}
+        self.cover_image = self.load_cover_image()
         self.selected_input_path: Optional[Path] = None
 
         self.build_ui()
         self.refresh_file_list()
+
+    def load_cover_image(self) -> Optional[PhotoImage]:
+        image_path = cover_image_path()
+        if not image_path.exists():
+            return None
+        try:
+            return PhotoImage(file=str(image_path)).subsample(3, 3)
+        except Exception:
+            return None
 
     def build_ui(self) -> None:
         style = ttk.Style()
@@ -312,7 +326,10 @@ class App:
         header = ttk.Frame(outer, style="Panel.TFrame", padding=(24, 18))
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(1, weight=1)
-        ttk.Label(header, text="DB", style="Card.TLabel", foreground=colors["accent"], font=("Helvetica", 15, "bold"), padding=(10, 7)).grid(row=0, column=0, rowspan=2, sticky="w")
+        if self.cover_image:
+            ttk.Label(header, image=self.cover_image, style="Panel.TLabel").grid(row=0, column=0, rowspan=2, sticky="w")
+        else:
+            ttk.Label(header, text="DB", style="Card.TLabel", foreground=colors["accent"], font=("Helvetica", 15, "bold"), padding=(10, 7)).grid(row=0, column=0, rowspan=2, sticky="w")
         ttk.Label(header, text="DuckyBruto Uniq", style="Panel.TLabel", font=("Helvetica", 16, "bold")).grid(row=0, column=1, sticky="sw", padx=(12, 0))
         ttk.Label(header, text="Пакетная подготовка фото и видео", style="PanelMuted.TLabel", font=("Helvetica", 10)).grid(row=1, column=1, sticky="nw", padx=(12, 0))
         ttk.Button(header, text="Проверить обновления", command=self.check_updates).grid(row=0, column=2, rowspan=2, sticky="e")
@@ -363,12 +380,24 @@ class App:
         ttk.Label(totals, textvariable=self.input_summary, style="PanelMuted.TLabel", font=("Helvetica", 10)).pack(side="left")
         ttk.Label(totals, textvariable=self.output_summary, style="PanelMuted.TLabel", font=("Helvetica", 10)).pack(side="right")
 
-        side = ttk.Frame(body, style="Panel.TFrame", padding=16)
+        side = ttk.Frame(body, style="Panel.TFrame")
         side.grid(row=1, column=1, sticky="nsew", padx=(10, 0))
+        side.rowconfigure(0, weight=1)
         side.columnconfigure(0, weight=1)
-        ttk.Label(side, text="Превью", style="Panel.TLabel", font=("Helvetica", 14, "bold")).grid(row=0, column=0, sticky="w")
-        self.preview_card(side, "До", 1)
-        self.preview_card(side, "После", 2)
+        preview_canvas = Canvas(side, bg=colors["surface"], highlightthickness=0, borderwidth=0)
+        preview_scroll = ttk.Scrollbar(side, orient="vertical", command=preview_canvas.yview)
+        preview_canvas.configure(yscrollcommand=preview_scroll.set)
+        preview_canvas.grid(row=0, column=0, sticky="nsew")
+        preview_scroll.grid(row=0, column=1, sticky="ns")
+        preview_inner = ttk.Frame(preview_canvas, style="Panel.TFrame", padding=16)
+        preview_window = preview_canvas.create_window((0, 0), window=preview_inner, anchor="nw")
+        preview_inner.columnconfigure(0, weight=1)
+        preview_inner.bind("<Configure>", lambda _e: preview_canvas.configure(scrollregion=preview_canvas.bbox("all")))
+        preview_canvas.bind("<Configure>", lambda e: preview_canvas.itemconfigure(preview_window, width=e.width))
+        preview_canvas.bind_all("<MouseWheel>", lambda e: preview_canvas.yview_scroll(-1 if e.delta > 0 else 1, "units"))
+        ttk.Label(preview_inner, text="Превью", style="Panel.TLabel", font=("Helvetica", 14, "bold")).grid(row=0, column=0, sticky="w")
+        self.preview_card(preview_inner, "До", 1)
+        self.preview_card(preview_inner, "После", 2)
 
         footer = ttk.Frame(outer, style="Panel.TFrame", padding=(22, 12))
         footer.grid(row=3, column=0, sticky="ew")
@@ -409,8 +438,8 @@ class App:
     def preview_card(self, parent, title: str, row: int) -> None:
         ttk.Label(parent, text=title, style="PanelMuted.TLabel", font=("Helvetica", 10, "bold")).grid(row=row * 2 - 1, column=0, sticky="w", pady=(12, 4))
         card = ttk.Frame(parent, style="Card.TFrame", padding=18)
-        card.grid(row=row * 2, column=0, sticky="ew")
-        image_label = ttk.Label(card, text="Нет файла", style="CardMuted.TLabel", anchor="center")
+        card.grid(row=row * 2, column=0, sticky="nsew")
+        image_label = ttk.Label(card, text="Нет файла", style="CardMuted.TLabel", anchor="center", width=36)
         image_label.pack(fill="both", expand=True)
         caption = ttk.Label(card, text="Выбери файл в списке", style="CardMuted.TLabel", font=("Helvetica", 10))
         caption.pack(pady=(6, 0))
@@ -775,7 +804,10 @@ class App:
                     out_dir = unique_output_dir(media_kind, copy_index, separate)
                     seed = random.SystemRandom().randint(100000, 999999999)
                     if media_kind == "video":
-                        uniquify_engine.uniquify(input_path, out_dir, 1, seed, strength, capcut_metadata)
+                        uniquify_engine.uniquify(
+                            input_path, out_dir, 1, seed, strength, capcut_metadata,
+                            progress_callback=lambda fraction, base=completed_jobs, total=total_jobs: self.update_job_progress(base, total, fraction),
+                        )
                     else:
                         uniquify_engine.uniquify_photo(input_path, out_dir, 1, seed, strength)
                     completed_jobs += 1
@@ -798,6 +830,10 @@ class App:
             self.root.after(0, self.done)
         except BaseException as exc:
             self.root.after(0, lambda exc=exc: self.fail(exc))
+
+    def update_job_progress(self, completed_before: int, total_jobs: int, fraction: float) -> None:
+        percent = int(max(0.0, min(1.0, (completed_before + fraction) / max(1, total_jobs))) * 100)
+        self.root.after(0, lambda p=percent: (self.progress_value.set(p), self.progress_text.set(f"{p}%")))
 
     def done(self) -> None:
         self.running = False

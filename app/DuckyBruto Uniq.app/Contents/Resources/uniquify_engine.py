@@ -8,6 +8,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable, Optional
 
 
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
@@ -95,6 +96,31 @@ def run(command: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
+def run_with_progress(command: list[str], duration: float, progress_callback: Optional[Callable[[float], None]] = None) -> subprocess.CompletedProcess:
+    if progress_callback is None or duration <= 0:
+        return run(command)
+    progress_cmd = command[:-1] + ["-progress", "pipe:1", "-nostats", command[-1]]
+    process = subprocess.Popen(progress_cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1)
+    last = 0.0
+    assert process.stdout is not None
+    for raw_line in process.stdout:
+        line = raw_line.strip()
+        if line.startswith("out_time_ms="):
+            try:
+                value = int(line.split("=", 1)[1]) / 1_000_000.0
+                fraction = max(last, min(0.995, value / duration))
+                if fraction - last >= 0.002:
+                    last = fraction
+                    progress_callback(fraction)
+            except (ValueError, ZeroDivisionError):
+                pass
+        elif line == "progress=end":
+            progress_callback(1.0)
+    stderr = process.stderr.read() if process.stderr is not None else ""
+    returncode = process.wait()
+    return subprocess.CompletedProcess(progress_cmd, returncode, "", stderr)
+
+
 def require_binary(name: str) -> None:
     if not shutil.which(name):
         print(f"Missing dependency: {name}", file=sys.stderr)
@@ -109,12 +135,22 @@ def probe(path: Path) -> dict:
         "-print_format",
         "json",
         "-show_streams",
+        "-show_format",
         str(path),
     ])
     if result.returncode != 0:
         print(result.stderr.strip(), file=sys.stderr)
         sys.exit(result.returncode)
     return json.loads(result.stdout)
+
+
+
+
+def media_duration(info: dict) -> float:
+    try:
+        return float(info.get("format", {}).get("duration", 0) or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def video_size(info: dict) -> tuple[int, int]:
@@ -309,6 +345,7 @@ def uniquify(
     base_seed: int | None,
     strength_name: str,
     capcut_metadata: bool = False,
+    progress_callback: Optional[Callable[[float], None]] = None,
 ) -> None:
     require_binary("ffmpeg")
     require_binary("ffprobe")
@@ -320,6 +357,7 @@ def uniquify(
     info = probe(input_path)
     width, height = video_size(info)
     audio = has_audio(info)
+    duration = media_duration(info)
     sample_rate = audio_sample_rate(info)
     strength = STRENGTHS[strength_name]
 
@@ -379,7 +417,7 @@ def uniquify(
         cmd += [str(output_path)]
 
         print(f"[{index}/{count}] writing {output_path}")
-        result = run(cmd)
+        result = run_with_progress(cmd, duration, progress_callback)
         if result.returncode != 0:
             print(result.stderr, file=sys.stderr)
             raise SystemExit(result.returncode)

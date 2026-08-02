@@ -56,8 +56,8 @@ xattr -dr com.apple.quarantine "/путь/к/day_xxx_uniquifier_macos"
 
 \`\`\`json
 {
-  "version": "1.2.1",
-  "zip_url": "https://github.com/day-xxx/day_xxx_uniquifier/releases/download/v1.2.1/duckybruto_uniq_macos_app.zip",
+  "version": "1.4.1",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
   "notes": "Что изменилось в версии"
 }
 \`\`\`
