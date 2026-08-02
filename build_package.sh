@@ -27,7 +27,7 @@ if command -v zip >/dev/null 2>&1; then
     "Install DuckyBruto Uniq.command" \
     "start.command" \
     "Если macOS пишет повреждено.txt" \
-    "Что нового в 1.4.1.txt" \
+    "Что нового в 1.4.2.txt" \
     "settings.json" \
     -x "*.DS_Store" "*__pycache__*"
 else
@@ -43,7 +43,7 @@ items = [
     Path("Install DuckyBruto Uniq.command"),
     Path("start.command"),
     Path("Если macOS пишет повреждено.txt"),
-    Path("Что нового в 1.4.1.txt"),
+    Path("Что нового в 1.4.2.txt"),
     Path("settings.json"),
 ]
 
@@ -51,7 +51,7 @@ with zipfile.ZipFile(package, "w", compression=zipfile.ZIP_DEFLATED) as archive:
     for item in items:
         if item.is_dir():
             for path in item.rglob("*"):
-                if path.name == ".DS_Store" or path.is_dir():
+                if path.name == ".DS_Store" or "__pycache__" in path.parts or path.is_dir():
                     continue
                 archive.write(path, path.as_posix())
         elif item.exists():
@@ -64,7 +64,7 @@ tar --exclude=".DS_Store" --exclude="__pycache__" -czf "$TARBALL" \
   "Install DuckyBruto Uniq.command" \
   "start.command" \
   "Если macOS пишет повреждено.txt" \
-  "Что нового в 1.4.1.txt" \
+  "Что нового в 1.4.2.txt" \
   "settings.json"
 
 cp "$PACKAGE" "$WORKSPACE_PACKAGE"

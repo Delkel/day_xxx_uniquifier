@@ -17,7 +17,7 @@ import uniquify_engine
 
 
 APP_NAME = "DuckyBruto Uniq"
-APP_VERSION = "1.4.1"
+APP_VERSION = "1.4.2"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
