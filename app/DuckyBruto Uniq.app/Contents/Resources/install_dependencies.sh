@@ -2,6 +2,7 @@
 set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+export PIP_USE_DEPRECATED=legacy-certs
 SUPPORT_DIR="$HOME/Library/Application Support/DuckyBruto Uniq"
 VENV_DIR="$SUPPORT_DIR/venv"
 
@@ -34,7 +35,7 @@ create_venv_without_ensurepip() {
   "$PYTHON" -m venv --without-pip "$VENV_DIR"
   GET_PIP="$SUPPORT_DIR/get-pip.py"
   curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$GET_PIP"
-  "$VENV_DIR/bin/python" "$GET_PIP"
+  "$VENV_DIR/bin/python" "$GET_PIP" --use-deprecated=legacy-certs
   rm -f "$GET_PIP"
 }
 
@@ -53,8 +54,8 @@ setup_with_python() {
   fi
 
   "$VENV_DIR/bin/python" -m pip --version
-  "$VENV_DIR/bin/python" -m pip install --upgrade pip setuptools wheel
-  "$VENV_DIR/bin/python" -m pip install PySide6
+  "$VENV_DIR/bin/python" -m pip install --use-deprecated=legacy-certs --upgrade pip setuptools wheel
+  "$VENV_DIR/bin/python" -m pip install --use-deprecated=legacy-certs PySide6
 }
 
 SUCCESS=0

@@ -1,6 +1,6 @@
-DuckyBruto Uniq 2.0.6
+DuckyBruto Uniq 2.0.7
 
-- Исправлен установщик зависимостей на Mac: если Python 3.13 ломается на ensurepip или pip, установщик пробует Python 3.12 и системный python3.
+- Исправлен установщик зависимостей на Mac: если Python 3.13 ломается на ensurepip или pip, установщик пробует Python 3.12 и системный python3, а pip запускает через legacy-certs, чтобы обойти сбой truststore.
 - Битое окружение в ~/Library/Application Support/DuckyBruto Uniq/venv удаляется и пересоздается автоматически.
 - Проверка обновлений читает GitHub manifest:
   https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json
