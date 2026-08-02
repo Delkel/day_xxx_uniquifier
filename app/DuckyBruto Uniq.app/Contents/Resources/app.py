@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
+import urllib.request
 from pathlib import Path
 
 try:
@@ -22,7 +26,7 @@ except ImportError:
 
 from uniquify_engine import PHOTO_EXTS, media_duration, uniquify, uniquify_photo
 
-APP_VERSION = "2.0.3"
+APP_VERSION = "2.0.4"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 ROOT = Path(os.environ.get("DAYXXX_UNIQUIFIER_ROOT", Path.home() / "Movies" / "day_xxx_uniquifier"))
 INPUT = ROOT / "input"
@@ -33,9 +37,104 @@ PROCESSED = ROOT / "processed"
 FAILED = ROOT / "failed"
 RESOURCES = Path(__file__).resolve().parent
 ICON = RESOURCES / "DuckyBrutoUniq.icns"
+SETTINGS_PATH = ROOT / "settings.json"
+UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
 
 for folder in (INPUT, VIDEOS_OUT, PHOTOS_OUT, PROCESSED, FAILED):
     folder.mkdir(parents=True, exist_ok=True)
+
+
+def load_settings() -> dict:
+    defaults = {"updateManifestUrl": UPDATE_MANIFEST_URL}
+    if not SETTINGS_PATH.exists():
+        SETTINGS_PATH.write_text(json.dumps(defaults, ensure_ascii=False, indent=2), encoding="utf-8")
+        return defaults
+    try:
+        data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        data = {}
+    merged = dict(defaults)
+    merged.update(data)
+    if not str(merged.get("updateManifestUrl") or "").strip():
+        merged["updateManifestUrl"] = UPDATE_MANIFEST_URL
+    SETTINGS_PATH.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+    return merged
+
+
+def version_tuple(value: str) -> tuple[int, ...]:
+    result = []
+    for chunk in value.split("."):
+        digits = ""
+        for char in chunk:
+            if char.isdigit():
+                digits += char
+            else:
+                break
+        result.append(int(digits or "0"))
+    return tuple(result)
+
+
+def fetch_update_manifest(url: str) -> dict:
+    request = urllib.request.Request(url, headers={"User-Agent": "DuckyBruto-Uniq-updater"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        raw = response.read(512 * 1024)
+    data = json.loads(raw.decode("utf-8"))
+    if not isinstance(data, dict) or not data.get("version") or not data.get("zip_url"):
+        raise RuntimeError("В update-manifest.json нужны поля version и zip_url")
+    return data
+
+
+def write_update_helper(manifest: dict) -> Path:
+    tmp_dir = Path(tempfile.mkdtemp(prefix="duckybruto_update_"))
+    helper = tmp_dir / "update_duckybruto_uniq.command"
+    zip_url = shlex.quote(str(manifest["zip_url"]))
+    version = shlex.quote(str(manifest["version"]))
+    script = f"""#!/bin/bash
+set -e
+ZIP_URL={zip_url}
+VERSION={version}
+WORK_DIR="$TMPDIR/duckybruto_uniq_update_$VERSION"
+ZIP_FILE="$WORK_DIR/DuckyBruto_Uniq_$VERSION.zip"
+
+echo "DuckyBruto Uniq: ставлю обновление $VERSION"
+rm -rf "$WORK_DIR"
+mkdir -p "$WORK_DIR"
+curl -L --fail -o "$ZIP_FILE" "$ZIP_URL"
+
+if command -v ditto >/dev/null 2>&1; then
+  ditto -x -k "$ZIP_FILE" "$WORK_DIR"
+else
+  unzip -q "$ZIP_FILE" -d "$WORK_DIR"
+fi
+
+cd "$WORK_DIR"
+if [ -f "Install DuckyBruto Uniq.command" ]; then
+  chmod +x "Install DuckyBruto Uniq.command"
+  open "Install DuckyBruto Uniq.command"
+elif [ -d "DuckyBruto Uniq.app" ]; then
+  mkdir -p "$HOME/Applications"
+  rm -rf "$HOME/Applications/DuckyBruto Uniq.app"
+  cp -R "DuckyBruto Uniq.app" "$HOME/Applications/"
+  xattr -dr com.apple.quarantine "$HOME/Applications/DuckyBruto Uniq.app" >/dev/null 2>&1 || true
+  open "$HOME/Applications/DuckyBruto Uniq.app"
+else
+  echo "В архиве не найдено приложение DuckyBruto Uniq.app"
+  exit 1
+fi
+"""
+    helper.write_text(script, encoding="utf-8")
+    helper.chmod(0o755)
+    return helper
+
+
+def run_command_in_terminal(path: Path):
+    subprocess.run([
+        "osascript",
+        "-e", 'tell application "Terminal" to activate',
+        "-e", f'tell application "Terminal" to do script {json.dumps(str(path))}',
+    ], check=True)
 
 
 def fmt_size(size: int) -> str:
@@ -100,6 +199,21 @@ class Worker(QThread):
         self.completed.emit(done, errors)
 
 
+class UpdateWorker(QThread):
+    checked = Signal(dict)
+    failed = Signal(str)
+
+    def __init__(self, url: str):
+        super().__init__()
+        self.url = url
+
+    def run(self):
+        try:
+            self.checked.emit(fetch_update_manifest(self.url))
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -110,6 +224,8 @@ class MainWindow(QMainWindow):
             self.setWindowIcon(QIcon(str(ICON)))
         self.files: list[Path] = []
         self.worker: Worker | None = None
+        self.update_worker: UpdateWorker | None = None
+        self.settings = load_settings()
         self.build_ui()
         self.apply_style()
         self.refresh_files()
@@ -143,7 +259,8 @@ class MainWindow(QMainWindow):
         self.refresh_btn = self.side_button("↻  Обновить список", self.refresh_files)
         self.open_input_btn = self.side_button("⌂  Открыть input", lambda: self.open_path(INPUT))
         self.open_output_btn = self.side_button("⇩  Открыть output", lambda: self.open_path(OUTPUT))
-        for b in (self.add_video_btn, self.add_photo_btn, self.refresh_btn, self.open_input_btn, self.open_output_btn):
+        self.update_btn = self.side_button("⬆  Проверить обновление", self.check_updates)
+        for b in (self.add_video_btn, self.add_photo_btn, self.refresh_btn, self.open_input_btn, self.open_output_btn, self.update_btn):
             side.addWidget(b)
         side.addStretch()
         self.ready = QLabel("●  Готов к работе")
@@ -359,6 +476,46 @@ class MainWindow(QMainWindow):
         self.start_btn.setEnabled(True); self.stop_btn.setEnabled(False); self.ready.setText("●  Готов к работе")
         self.status.setText(f"Завершено: {done}, ошибок: {errors}")
         self.refresh_files()
+
+    def check_updates(self):
+        url = str(self.settings.get("updateManifestUrl") or UPDATE_MANIFEST_URL).strip()
+        if not url:
+            QMessageBox.information(self, "Обновления", "Ссылка на манифест обновлений не настроена.")
+            return
+        self.update_btn.setEnabled(False)
+        self.ready.setText("●  Проверяю обновление…")
+        self.update_worker = UpdateWorker(url)
+        self.update_worker.checked.connect(self.on_update_checked)
+        self.update_worker.failed.connect(self.on_update_failed)
+        self.update_worker.finished.connect(lambda: self.update_btn.setEnabled(True))
+        self.update_worker.start()
+
+    def on_update_checked(self, manifest: dict):
+        latest = str(manifest.get("version", "0"))
+        if version_tuple(latest) <= version_tuple(APP_VERSION):
+            self.ready.setText("●  Готов к работе")
+            QMessageBox.information(self, "Обновления", f"Установлена актуальная версия {APP_VERSION}.")
+            return
+        notes = str(manifest.get("notes") or "").strip()
+        text = f"Доступна версия {latest}. Установить обновление?"
+        if notes:
+            text += f"\n\n{notes}"
+        self.ready.setText("●  Доступно обновление")
+        if QMessageBox.question(self, "Обновление DuckyBruto Uniq", text) != QMessageBox.Yes:
+            self.ready.setText("●  Готов к работе")
+            return
+        try:
+            helper = write_update_helper(manifest)
+            run_command_in_terminal(helper)
+            QApplication.instance().quit()
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка обновления", f"Не удалось подготовить обновление:\n{exc}")
+            self.ready.setText("●  Готов к работе")
+
+    def on_update_failed(self, error: str):
+        self.update_btn.setEnabled(True)
+        self.ready.setText("●  Готов к работе")
+        QMessageBox.critical(self, "Ошибка обновления", f"Не удалось проверить обновления:\n{error}")
 
     def open_path(self, path):
         subprocess.Popen(["open", str(path)])
