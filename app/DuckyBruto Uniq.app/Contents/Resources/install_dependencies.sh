@@ -25,7 +25,32 @@ fi
 
 mkdir -p "$SUPPORT_DIR"
 rm -rf "$VENV_DIR"
-"$PYTHON" -m venv "$VENV_DIR"
+
+create_venv() {
+  rm -rf "$VENV_DIR"
+  "$PYTHON" -m venv "$VENV_DIR"
+}
+
+create_venv_without_ensurepip() {
+  rm -rf "$VENV_DIR"
+  "$PYTHON" -m venv --without-pip "$VENV_DIR"
+  GET_PIP="$SUPPORT_DIR/get-pip.py"
+  curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$GET_PIP"
+  "$VENV_DIR/bin/python" "$GET_PIP"
+  rm -f "$GET_PIP"
+}
+
+if ! create_venv; then
+  echo "Обычное создание Python-окружения не прошло. Пробую восстановить Homebrew Python..."
+  brew reinstall python@3.13
+  BREW_PREFIX="$(brew --prefix)"
+  PYTHON="$BREW_PREFIX/opt/python@3.13/bin/python3.13"
+  if ! create_venv; then
+    echo "ensurepip снова упал. Создаю окружение без ensurepip и ставлю pip отдельно..."
+    create_venv_without_ensurepip
+  fi
+fi
+
 "$VENV_DIR/bin/python" -m pip install --upgrade pip setuptools wheel
 "$VENV_DIR/bin/python" -m pip install PySide6
 

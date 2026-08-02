@@ -1,5 +1,5 @@
 {
-  "version": "2.0.4",
+  "version": "2.0.5",
   "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
-  "notes": "DuckyBruto Uniq 2.0.4: возвращена кнопка проверки обновлений через GitHub, сохранен автозапуск установщика при проблемах с PySide6."
+  "notes": "DuckyBruto Uniq 2.0.5: установщик Mac сам восстанавливает битое Python-окружение, если Homebrew Python падает на ensurepip."
 }
