@@ -4,6 +4,8 @@ RESOURCES="$APP_DIR/Resources"
 APP_BUNDLE="$(cd "$APP_DIR/.." && pwd)"
 LOG_DIR="$HOME/Library/Logs"
 LOG_FILE="$LOG_DIR/day_xxx_uniquifier.log"
+VENV_PYTHON="$HOME/Library/Application Support/DuckyBruto Uniq/venv/bin/python"
+
 case "$APP_BUNDLE" in
   /Applications/*|"$HOME"/Applications/*)
     ROOT="$HOME/Movies/day_xxx_uniquifier"
@@ -12,34 +14,36 @@ case "$APP_BUNDLE" in
     ROOT="$(cd "$APP_DIR/../../.." && pwd)"
     ;;
 esac
+
 export DAYXXX_UNIQUIFIER_ROOT="$ROOT"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-
 mkdir -p "$LOG_DIR"
+
 {
   echo "== DuckyBruto Uniq launch =="
   date
   echo "APP_BUNDLE=$APP_BUNDLE"
   echo "ROOT=$ROOT"
+  echo "VENV_PYTHON=$VENV_PYTHON"
   echo "PATH=$PATH"
 } > "$LOG_FILE"
 
-if command -v python3 >/dev/null 2>&1; then
-  python3 "$RESOURCES/app.py" >> "$LOG_FILE" 2>&1
-  STATUS=$?
-  if [ "$STATUS" -ne 0 ]; then
-    osascript -e 'display dialog "DuckyBruto Uniq не смог запуститься. Я открою лог ошибки; чаще всего нужно запустить установщик зависимостей из архива." buttons {"OK"} default button "OK" with icon stop' >/dev/null 2>&1
-    open "$LOG_FILE" >/dev/null 2>&1
-  fi
-  exit "$STATUS"
+if [ ! -x "$VENV_PYTHON" ]; then
+  osascript -e 'display dialog "Не найдено окружение DuckyBruto Uniq. Запустите файл Install DuckyBruto Uniq.command из архива." buttons {"OK"} default button "OK" with icon caution' >/dev/null 2>&1
+  exit 1
 fi
 
-ANSWER="$(osascript -e 'button returned of (display dialog "Нужен Python 3. Поставить автоматически через Homebrew? Это может занять несколько минут." buttons {"Отмена", "Поставить"} default button "Поставить" with icon caution)' 2>/dev/null)"
-if [ "$ANSWER" = "Поставить" ]; then
-  INSTALL_SCRIPT="$RESOURCES/install_dependencies.sh"
-  osascript -e "tell application \"Terminal\" to do script quoted form of \"$INSTALL_SCRIPT\""
-  osascript -e 'display dialog "Установка открыта в Terminal. Когда она завершится, запусти приложение снова." buttons {"OK"} default button "OK" with icon note'
-else
-  osascript -e 'display dialog "Без Python 3 приложение не запустится." buttons {"OK"} default button "OK" with icon stop'
+"$VENV_PYTHON" -c 'import PySide6' >> "$LOG_FILE" 2>&1
+if [ "$?" -ne 0 ]; then
+  osascript -e 'display dialog "PySide6 установлен некорректно. Повторно запустите Install DuckyBruto Uniq.command." buttons {"OK"} default button "OK" with icon stop' >/dev/null 2>&1
+  open "$LOG_FILE" >/dev/null 2>&1
+  exit 1
 fi
-exit 1
+
+"$VENV_PYTHON" "$RESOURCES/app.py" >> "$LOG_FILE" 2>&1
+STATUS=$?
+if [ "$STATUS" -ne 0 ]; then
+  osascript -e 'display dialog "DuckyBruto Uniq не смог запуститься. Открываю журнал ошибки." buttons {"OK"} default button "OK" with icon stop' >/dev/null 2>&1
+  open "$LOG_FILE" >/dev/null 2>&1
+fi
+exit "$STATUS"
