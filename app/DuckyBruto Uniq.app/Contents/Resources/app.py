@@ -26,7 +26,7 @@ except ImportError:
 
 from uniquify_engine import PHOTO_EXTS, media_duration, uniquify, uniquify_photo
 
-APP_VERSION = "2.0.7"
+APP_VERSION = "2.0.8"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 ROOT = Path(os.environ.get("DAYXXX_UNIQUIFIER_ROOT", Path.home() / "Movies" / "day_xxx_uniquifier"))
 INPUT = ROOT / "input"
@@ -37,6 +37,7 @@ PROCESSED = ROOT / "processed"
 FAILED = ROOT / "failed"
 RESOURCES = Path(__file__).resolve().parent
 ICON = RESOURCES / "DuckyBrutoUniq.icns"
+LOGO = RESOURCES / "DuckyBrutoUniq.png"
 SETTINGS_PATH = ROOT / "settings.json"
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json"
 
@@ -245,7 +246,10 @@ class MainWindow(QMainWindow):
         brand = QHBoxLayout()
         logo = QLabel()
         logo.setFixedSize(54, 54)
-        if ICON.exists():
+        if LOGO.exists():
+            pix = QPixmap(str(LOGO)).scaled(54, 54, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo.setPixmap(pix)
+        elif ICON.exists():
             logo.setPixmap(QIcon(str(ICON)).pixmap(QSize(54, 54)))
         brand.addWidget(logo)
         title = QLabel(f"<b>DuckyBruto</b><br><span style='color:#8b5cf6'>Uniq</span><br><small>{APP_VERSION}</small>")
