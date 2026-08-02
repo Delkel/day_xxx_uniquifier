@@ -5,6 +5,7 @@ APP_BUNDLE="$(cd "$APP_DIR/.." && pwd)"
 LOG_DIR="$HOME/Library/Logs"
 LOG_FILE="$LOG_DIR/day_xxx_uniquifier.log"
 VENV_PYTHON="$HOME/Library/Application Support/DuckyBruto Uniq/venv/bin/python"
+INSTALLER="$RESOURCES/install_dependencies.sh"
 
 case "$APP_BUNDLE" in
   /Applications/*|"$HOME"/Applications/*)
@@ -28,15 +29,23 @@ mkdir -p "$LOG_DIR"
   echo "PATH=$PATH"
 } > "$LOG_FILE"
 
+run_installer() {
+  chmod +x "$INSTALLER" >/dev/null 2>&1 || true
+  osascript \
+    -e 'tell application "Terminal" to activate' \
+    -e "tell application \"Terminal\" to do script \"sh \" & quoted form of \"$INSTALLER\"" >/dev/null 2>&1
+}
+
 if [ ! -x "$VENV_PYTHON" ]; then
-  osascript -e 'display dialog "Не найдено окружение DuckyBruto Uniq. Запустите файл Install DuckyBruto Uniq.command из архива." buttons {"OK"} default button "OK" with icon caution' >/dev/null 2>&1
+  osascript -e 'display dialog "Не найдено окружение DuckyBruto Uniq. Сейчас открою установщик зависимостей. После завершения установки запустите приложение еще раз." buttons {"OK"} default button "OK" with icon caution' >/dev/null 2>&1
+  run_installer
   exit 1
 fi
 
 "$VENV_PYTHON" -c 'import PySide6' >> "$LOG_FILE" 2>&1
 if [ "$?" -ne 0 ]; then
-  osascript -e 'display dialog "PySide6 установлен некорректно. Повторно запустите Install DuckyBruto Uniq.command." buttons {"OK"} default button "OK" with icon stop' >/dev/null 2>&1
-  open "$LOG_FILE" >/dev/null 2>&1
+  osascript -e 'display dialog "PySide6 установлен некорректно. Сейчас открою переустановку зависимостей. После завершения запустите приложение еще раз." buttons {"OK"} default button "OK" with icon stop' >/dev/null 2>&1
+  run_installer
   exit 1
 fi
 
