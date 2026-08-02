@@ -26,7 +26,7 @@ except ImportError:
 
 from uniquify_engine import PHOTO_EXTS, media_duration, uniquify, uniquify_photo
 
-APP_VERSION = "2.0.10"
+APP_VERSION = "2.0.11"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 ROOT = Path(os.environ.get("DAYXXX_UNIQUIFIER_ROOT", Path.home() / "Movies" / "day_xxx_uniquifier"))
 INPUT = ROOT / "input"

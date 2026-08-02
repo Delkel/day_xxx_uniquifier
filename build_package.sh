@@ -27,7 +27,7 @@ if command -v zip >/dev/null 2>&1; then
     "Install DuckyBruto Uniq.command" \
     "start.command" \
     "Если macOS пишет повреждено.txt" \
-    "Что нового в 2.0.10.txt" \
+    "Что нового в 2.0.11.txt" \
     "settings.json" \
     -x "*.DS_Store" "*__pycache__*"
 else
@@ -43,7 +43,7 @@ items = [
     Path("Install DuckyBruto Uniq.command"),
     Path("start.command"),
     Path("Если macOS пишет повреждено.txt"),
-    Path("Что нового в 2.0.10.txt"),
+    Path("Что нового в 2.0.11.txt"),
     Path("settings.json"),
 ]
 
@@ -64,7 +64,7 @@ tar --exclude=".DS_Store" --exclude="__pycache__" -czf "$TARBALL" \
   "Install DuckyBruto Uniq.command" \
   "start.command" \
   "Если macOS пишет повреждено.txt" \
-  "Что нового в 2.0.10.txt" \
+  "Что нового в 2.0.11.txt" \
   "settings.json"
 
 cp "$PACKAGE" "$WORKSPACE_PACKAGE"

@@ -3,8 +3,18 @@ set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export PIP_USE_DEPRECATED=legacy-certs
+export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
 SUPPORT_DIR="$HOME/Library/Application Support/DuckyBruto Uniq"
 VENV_DIR="$SUPPORT_DIR/venv"
+
+configure_python_platform() {
+  ARCH="$(uname -m)"
+  if [ "$ARCH" = "arm64" ]; then
+    export _PYTHON_HOST_PLATFORM="macosx-13.0-arm64"
+  else
+    export _PYTHON_HOST_PLATFORM="macosx-13.0-x86_64"
+  fi
+}
 
 if ! command -v brew >/dev/null 2>&1; then
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -27,22 +37,16 @@ rm -rf "$VENV_DIR"
 
 create_venv() {
   rm -rf "$VENV_DIR"
+  configure_python_platform
   if "$PYTHON" -m venv "$VENV_DIR"; then
     return 0
   fi
 
-  echo "venv через ensurepip не создался, пробую запасной режим без ensurepip..."
+  echo "venv через встроенный pip не создался, пробую запасной режим без pip..."
   rm -rf "$VENV_DIR"
   "$PYTHON" -m venv --without-pip "$VENV_DIR"
   GET_PIP="$SUPPORT_DIR/get-pip.py"
   curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$GET_PIP"
-  ARCH="$(uname -m)"
-  if [ "$ARCH" = "arm64" ]; then
-    export _PYTHON_HOST_PLATFORM="macosx-13.0-arm64"
-  else
-    export _PYTHON_HOST_PLATFORM="macosx-13.0-x86_64"
-  fi
-  export MACOSX_DEPLOYMENT_TARGET="13.0"
   "$VENV_DIR/bin/python" "$GET_PIP" --use-deprecated=legacy-certs
   rm -f "$GET_PIP"
 }

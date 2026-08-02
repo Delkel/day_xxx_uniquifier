@@ -1,0 +1,5 @@
+DuckyBruto Uniq 2.0.11
+
+- Исправлен установщик зависимостей на Mac: Python-окружение теперь создается с явной macOS-платформой.
+- Это чинит ошибку pip вида ValueError: invalid literal for int() with base 10: ''.
+- Если до этого установка уже сломалась, просто запусти свежий Install DuckyBruto Uniq.command еще раз.
