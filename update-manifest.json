@@ -1,5 +1,5 @@
 {
-  "version": "2.0.2",
-  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/f34e793a6c19ab25b71d367794d1ad86f77dbcb1/release/duckybruto_uniq_macos_app.zip",
-  "notes": "DuckyBruto Uniq 2.0.2: launcher сам открывает установщик зависимостей, если отдельное окружение Python или PySide6 еще не установлены."
+  "version": "2.0.3",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
+  "notes": "DuckyBruto Uniq 2.0.3: если PySide6 не установлен, приложение само запускает установку зависимостей и открывается после нее."
 }
