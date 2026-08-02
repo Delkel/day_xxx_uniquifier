@@ -14,14 +14,12 @@ if ! command -v brew >/dev/null 2>&1; then
   fi
 fi
 
-brew install python@3.13 ffmpeg
+brew install python@3.13 python@3.12 ffmpeg
 
 BREW_PREFIX="$(brew --prefix)"
-PYTHON="$BREW_PREFIX/opt/python@3.13/bin/python3.13"
-if [ ! -x "$PYTHON" ]; then
-  echo "Не найден Python 3.13: $PYTHON"
-  exit 1
-fi
+PYTHON_313="$BREW_PREFIX/opt/python@3.13/bin/python3.13"
+PYTHON_312="$BREW_PREFIX/opt/python@3.12/bin/python3.12"
+PYTHON_SYSTEM="$(command -v python3 || true)"
 
 mkdir -p "$SUPPORT_DIR"
 rm -rf "$VENV_DIR"
@@ -40,19 +38,38 @@ create_venv_without_ensurepip() {
   rm -f "$GET_PIP"
 }
 
-if ! create_venv; then
-  echo "Обычное создание Python-окружения не прошло. Пробую восстановить Homebrew Python..."
-  brew reinstall python@3.13
-  BREW_PREFIX="$(brew --prefix)"
-  PYTHON="$BREW_PREFIX/opt/python@3.13/bin/python3.13"
+setup_with_python() {
+  PYTHON="$1"
+  if [ ! -x "$PYTHON" ]; then
+    return 1
+  fi
+
+  echo "Пробую Python: $PYTHON"
+  "$PYTHON" --version
+
   if ! create_venv; then
-    echo "ensurepip снова упал. Создаю окружение без ensurepip и ставлю pip отдельно..."
+    echo "venv через ensurepip не создался, пробую без ensurepip..."
     create_venv_without_ensurepip
   fi
-fi
 
-"$VENV_DIR/bin/python" -m pip install --upgrade pip setuptools wheel
-"$VENV_DIR/bin/python" -m pip install PySide6
+  "$VENV_DIR/bin/python" -m pip --version
+  "$VENV_DIR/bin/python" -m pip install --upgrade pip setuptools wheel
+  "$VENV_DIR/bin/python" -m pip install PySide6
+}
+
+SUCCESS=0
+for CANDIDATE in "$PYTHON_313" "$PYTHON_312" "$PYTHON_SYSTEM"; do
+  if setup_with_python "$CANDIDATE"; then
+    SUCCESS=1
+    break
+  fi
+  echo "Этот Python не подошел: $CANDIDATE"
+done
+
+if [ "$SUCCESS" -ne 1 ]; then
+  echo "Не удалось создать рабочее Python-окружение. Попробуй выполнить: brew reinstall python@3.13 python@3.12"
+  exit 1
+fi
 
 "$VENV_DIR/bin/python" - <<'PY'
 from PySide6.QtWidgets import QApplication

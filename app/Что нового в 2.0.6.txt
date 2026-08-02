@@ -1,6 +1,6 @@
-DuckyBruto Uniq 2.0.5
+DuckyBruto Uniq 2.0.6
 
-- Исправлен установщик зависимостей на Mac: если Homebrew Python падает на ensurepip, окружение создается без ensurepip, а pip ставится отдельно.
+- Исправлен установщик зависимостей на Mac: если Python 3.13 ломается на ensurepip или pip, установщик пробует Python 3.12 и системный python3.
 - Битое окружение в ~/Library/Application Support/DuckyBruto Uniq/venv удаляется и пересоздается автоматически.
 - Проверка обновлений читает GitHub manifest:
   https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/update-manifest.json
