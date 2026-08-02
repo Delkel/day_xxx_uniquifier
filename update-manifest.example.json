@@ -1,5 +1,5 @@
 {
-  "version": "1.2.1",
-  "zip_url": "https://github.com/Delkel/day_xxx_uniquifier/releases/download/v1.2.1/duckybruto_uniq_macos_app.zip",
-  "notes": "Новое имя DuckyBruto Uniq, иконка, обработка фото и правильные папки copy_01/copy_02 для комплектов видео и фото."
+  "version": "2.0.0",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
+  "notes": "Новая Qt-версия DuckyBruto Uniq 2.0.0: отдельная обработка видео и фото, таблица файлов, предпросмотр, прогресс по каждому файлу и обновленный интерфейс."
 }

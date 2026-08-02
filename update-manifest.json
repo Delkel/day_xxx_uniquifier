@@ -1,5 +1,5 @@
 {
-  "version": "1.5.1",
+  "version": "2.0.0",
   "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
-  "notes": "Добавлен плавный прогресс обработки и обновленный интерфейс. Сохранена обложка рядом с названием и публикация обновления через GitHub."
+  "notes": "Новая Qt-версия DuckyBruto Uniq 2.0.0: отдельная обработка видео и фото, таблица файлов, предпросмотр, прогресс по каждому файлу и обновленный интерфейс."
 }
