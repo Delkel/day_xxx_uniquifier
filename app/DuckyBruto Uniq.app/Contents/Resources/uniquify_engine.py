@@ -6,9 +6,9 @@ import random
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
@@ -96,31 +96,6 @@ def run(command: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-def run_with_progress(command: list[str], duration: float, progress_callback: Optional[Callable[[float], None]] = None) -> subprocess.CompletedProcess:
-    if progress_callback is None or duration <= 0:
-        return run(command)
-    progress_cmd = command[:-1] + ["-progress", "pipe:1", "-nostats", command[-1]]
-    process = subprocess.Popen(progress_cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1)
-    last = 0.0
-    assert process.stdout is not None
-    for raw_line in process.stdout:
-        line = raw_line.strip()
-        if line.startswith("out_time_ms="):
-            try:
-                value = int(line.split("=", 1)[1]) / 1_000_000.0
-                fraction = max(last, min(0.995, value / duration))
-                if fraction - last >= 0.002:
-                    last = fraction
-                    progress_callback(fraction)
-            except (ValueError, ZeroDivisionError):
-                pass
-        elif line == "progress=end":
-            progress_callback(1.0)
-    stderr = process.stderr.read() if process.stderr is not None else ""
-    returncode = process.wait()
-    return subprocess.CompletedProcess(progress_cmd, returncode, "", stderr)
-
-
 def require_binary(name: str) -> None:
     if not shutil.which(name):
         print(f"Missing dependency: {name}", file=sys.stderr)
@@ -135,7 +110,6 @@ def probe(path: Path) -> dict:
         "-print_format",
         "json",
         "-show_streams",
-        "-show_format",
         str(path),
     ])
     if result.returncode != 0:
@@ -144,13 +118,75 @@ def probe(path: Path) -> dict:
     return json.loads(result.stdout)
 
 
-
-
-def media_duration(info: dict) -> float:
+def media_duration(path: Path) -> float:
+    result = run([
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(path),
+    ])
+    if result.returncode != 0:
+        return 0.0
     try:
-        return float(info.get("format", {}).get("duration", 0) or 0)
+        return max(0.0, float(result.stdout.strip()))
     except (TypeError, ValueError):
         return 0.0
+
+
+def run_with_progress(command: list[str], duration: float, callback: Callable[[float], None] | None) -> None:
+    # FFmpeg emits machine-readable key=value updates through stdout.
+    progress_cmd = command[:-1] + ["-progress", "pipe:1", "-nostats", command[-1]]
+    process = subprocess.Popen(
+        progress_cmd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=1,
+    )
+    assert process.stdout is not None
+    last_value = -1.0
+    for raw_line in process.stdout:
+        line = raw_line.strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        seconds = None
+        if key == "out_time_us":
+            try:
+                seconds = int(value) / 1_000_000
+            except ValueError:
+                pass
+        elif key == "out_time_ms":
+            try:
+                # Current FFmpeg uses microseconds despite the historical key name.
+                seconds = int(value) / 1_000_000
+            except ValueError:
+                pass
+        elif key == "out_time":
+            try:
+                hours, minutes, seconds_text = value.split(":")
+                seconds = int(hours) * 3600 + int(minutes) * 60 + float(seconds_text)
+            except (ValueError, TypeError):
+                pass
+        elif key == "progress" and value == "end":
+            if callback:
+                callback(1.0)
+
+        if seconds is not None and duration > 0 and callback:
+            current = min(0.995, max(0.0, seconds / duration))
+            if current - last_value >= 0.001:
+                last_value = current
+                callback(current)
+
+    stderr = process.stderr.read() if process.stderr else ""
+    returncode = process.wait()
+    if returncode != 0:
+        print(stderr, file=sys.stderr)
+        raise RuntimeError(stderr.strip() or f"FFmpeg exited with code {returncode}")
 
 
 def video_size(info: dict) -> tuple[int, int]:
@@ -345,7 +381,7 @@ def uniquify(
     base_seed: int | None,
     strength_name: str,
     capcut_metadata: bool = False,
-    progress_callback: Optional[Callable[[float], None]] = None,
+    progress_callback: Callable[[float], None] | None = None,
 ) -> None:
     require_binary("ffmpeg")
     require_binary("ffprobe")
@@ -357,9 +393,9 @@ def uniquify(
     info = probe(input_path)
     width, height = video_size(info)
     audio = has_audio(info)
-    duration = media_duration(info)
     sample_rate = audio_sample_rate(info)
     strength = STRENGTHS[strength_name]
+    duration = media_duration(input_path)
 
     for index in range(1, count + 1):
         seed = base_seed + index - 1 if base_seed is not None else random.SystemRandom().randint(100000, 999999999)
@@ -417,10 +453,11 @@ def uniquify(
         cmd += [str(output_path)]
 
         print(f"[{index}/{count}] writing {output_path}")
-        result = run_with_progress(cmd, duration, progress_callback)
-        if result.returncode != 0:
-            print(result.stderr, file=sys.stderr)
-            raise SystemExit(result.returncode)
+        def variant_progress(value: float) -> None:
+            if progress_callback:
+                progress_callback(((index - 1) + value) / count)
+
+        run_with_progress(cmd, duration, variant_progress)
 
 
 def build_photo_filters(width: int, height: int, rng: random.Random, strength: Strength, strength_name: str) -> str:
