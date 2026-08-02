@@ -6,6 +6,7 @@ export PIP_USE_DEPRECATED=legacy-certs
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
 SUPPORT_DIR="$HOME/Library/Application Support/DuckyBruto Uniq"
 VENV_DIR="$SUPPORT_DIR/venv"
+PATCH_DIR="$SUPPORT_DIR/python-install-patch"
 
 configure_python_platform() {
   ARCH="$(uname -m)"
@@ -14,6 +15,24 @@ configure_python_platform() {
   else
     export _PYTHON_HOST_PLATFORM="macosx-13.0-x86_64"
   fi
+}
+
+install_macos_platform_patch() {
+  mkdir -p "$PATCH_DIR"
+  cat > "$PATCH_DIR/sitecustomize.py" <<'PY'
+import platform
+
+_real_mac_ver = platform.mac_ver
+
+def _patched_mac_ver(*args, **kwargs):
+    version, versioninfo, machine = _real_mac_ver(*args, **kwargs)
+    if not version:
+        version = "13.0"
+    return version, versioninfo, machine
+
+platform.mac_ver = _patched_mac_ver
+PY
+  export PYTHONPATH="$PATCH_DIR${PYTHONPATH:+:$PYTHONPATH}"
 }
 
 if ! command -v brew >/dev/null 2>&1; then
@@ -34,6 +53,7 @@ PYTHON_SYSTEM="$(command -v python3 || true)"
 
 mkdir -p "$SUPPORT_DIR"
 rm -rf "$VENV_DIR"
+install_macos_platform_patch
 
 create_venv() {
   rm -rf "$VENV_DIR"
