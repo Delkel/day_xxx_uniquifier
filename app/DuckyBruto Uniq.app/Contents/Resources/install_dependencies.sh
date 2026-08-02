@@ -27,9 +27,22 @@ rm -rf "$VENV_DIR"
 
 create_venv() {
   rm -rf "$VENV_DIR"
+  if "$PYTHON" -m venv "$VENV_DIR"; then
+    return 0
+  fi
+
+  echo "venv через ensurepip не создался, пробую запасной режим без ensurepip..."
+  rm -rf "$VENV_DIR"
   "$PYTHON" -m venv --without-pip "$VENV_DIR"
   GET_PIP="$SUPPORT_DIR/get-pip.py"
   curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$GET_PIP"
+  ARCH="$(uname -m)"
+  if [ "$ARCH" = "arm64" ]; then
+    export _PYTHON_HOST_PLATFORM="macosx-13.0-arm64"
+  else
+    export _PYTHON_HOST_PLATFORM="macosx-13.0-x86_64"
+  fi
+  export MACOSX_DEPLOYMENT_TARGET="13.0"
   "$VENV_DIR/bin/python" "$GET_PIP" --use-deprecated=legacy-certs
   rm -f "$GET_PIP"
 }

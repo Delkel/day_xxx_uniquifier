@@ -1,5 +1,5 @@
 {
-  "version": "2.0.9",
+  "version": "2.0.10",
   "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/duckybruto_uniq_macos_app.zip",
-  "notes": "DuckyBruto Uniq 2.0.9: исправлен установщик зависимостей на Mac. Теперь он сначала использует Python 3.12 и создает окружение без ensurepip, чтобы обходить падение Python 3.13."
+  "notes": "DuckyBruto Uniq 2.0.10: исправлен установщик зависимостей на Mac. Python 3.12 снова пробует обычный venv с pip, а запасной get-pip режим запускается с явной macOS-платформой."
 }
