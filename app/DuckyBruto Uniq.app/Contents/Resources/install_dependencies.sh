@@ -15,22 +15,17 @@ if ! command -v brew >/dev/null 2>&1; then
   fi
 fi
 
-brew install python@3.13 python@3.12 ffmpeg
+brew install python@3.12 ffmpeg
 
 BREW_PREFIX="$(brew --prefix)"
-PYTHON_313="$BREW_PREFIX/opt/python@3.13/bin/python3.13"
 PYTHON_312="$BREW_PREFIX/opt/python@3.12/bin/python3.12"
+PYTHON_313="$BREW_PREFIX/opt/python@3.13/bin/python3.13"
 PYTHON_SYSTEM="$(command -v python3 || true)"
 
 mkdir -p "$SUPPORT_DIR"
 rm -rf "$VENV_DIR"
 
 create_venv() {
-  rm -rf "$VENV_DIR"
-  "$PYTHON" -m venv "$VENV_DIR"
-}
-
-create_venv_without_ensurepip() {
   rm -rf "$VENV_DIR"
   "$PYTHON" -m venv --without-pip "$VENV_DIR"
   GET_PIP="$SUPPORT_DIR/get-pip.py"
@@ -48,10 +43,7 @@ setup_with_python() {
   echo "Пробую Python: $PYTHON"
   "$PYTHON" --version
 
-  if ! create_venv; then
-    echo "venv через ensurepip не создался, пробую без ensurepip..."
-    create_venv_without_ensurepip
-  fi
+  create_venv
 
   "$VENV_DIR/bin/python" -m pip --version
   "$VENV_DIR/bin/python" -m pip install --use-deprecated=legacy-certs --upgrade pip setuptools wheel
@@ -59,7 +51,7 @@ setup_with_python() {
 }
 
 SUCCESS=0
-for CANDIDATE in "$PYTHON_313" "$PYTHON_312" "$PYTHON_SYSTEM"; do
+for CANDIDATE in "$PYTHON_312" "$PYTHON_313" "$PYTHON_SYSTEM"; do
   if setup_with_python "$CANDIDATE"; then
     SUCCESS=1
     break
@@ -68,7 +60,7 @@ for CANDIDATE in "$PYTHON_313" "$PYTHON_312" "$PYTHON_SYSTEM"; do
 done
 
 if [ "$SUCCESS" -ne 1 ]; then
-  echo "Не удалось создать рабочее Python-окружение. Попробуй выполнить: brew reinstall python@3.13 python@3.12"
+  echo "Не удалось создать рабочее Python-окружение. Попробуй выполнить: brew reinstall python@3.12"
   exit 1
 fi
 

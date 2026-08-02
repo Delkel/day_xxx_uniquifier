@@ -1,0 +1,5 @@
+DuckyBruto Uniq 2.0.9
+
+- Исправлен установщик зависимостей на Mac.
+- Установщик сначала использует Python 3.12 вместо Python 3.13.
+- Окружение создается без ensurepip и ставит pip через get-pip.py, чтобы обходить ошибку ensurepip на Homebrew Python 3.13.
