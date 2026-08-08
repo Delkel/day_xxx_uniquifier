@@ -1,0 +1,92 @@
+{
+  "hooks": [
+    "POV: this look finally made it to the camera",
+    "Save this idea before it disappears",
+    "A small detail, a whole new vibe",
+    "This is your sign to try it today",
+    "Soft, simple, and impossible to ignore",
+    "The kind of moment that deserves a replay",
+    "No overthinking, just the vibe",
+    "Tiny changes, big energy",
+    "This one belongs on your moodboard",
+    "When the light, the look, and the timing match",
+    "A clean moment with main character energy",
+    "Posting this before I talk myself out of it"
+  ],
+  "cta": [
+    "Would you try this?",
+    "Save it for later.",
+    "Send this to someone who needs the idea.",
+    "Comment if you want more like this.",
+    "Which version is your favorite?",
+    "Keep this for your next post.",
+    "Drop a + if this is your vibe.",
+    "Follow for more quick ideas.",
+    "Use this as your next content cue.",
+    "Tell me what style to do next."
+  ],
+  "styles": {
+    "beauty": {
+      "lines": [
+        "soft glam with a clean finish",
+        "glow that feels effortless, not overdone",
+        "a fresh look with just enough shine",
+        "the kind of beauty detail that changes the whole frame",
+        "simple skin, bright eyes, polished energy",
+        "a minimal look that still reads expensive",
+        "clean beauty with a soft-focus mood",
+        "easy glow, strong impact",
+        "a subtle detail that makes the video feel finished",
+        "the no-stress version of a camera-ready look"
+      ],
+      "tags": ["#makeup", "#beauty", "#glowup", "#beautytips", "#softglam", "#reels", "#instabeauty", "#contentideas"]
+    },
+    "fashion": {
+      "lines": [
+        "basic pieces, but the styling does the work",
+        "an easy outfit that still feels put together",
+        "minimal effort, clean result",
+        "the kind of fit that works from day to night",
+        "simple layers with a polished finish",
+        "a quiet outfit with expensive energy",
+        "this is how basics stop looking basic",
+        "a wearable look with scroll-stopping shape",
+        "clean lines, better proportions, stronger vibe",
+        "outfit inspiration without the overcomplication"
+      ],
+      "tags": ["#outfit", "#style", "#fashion", "#ootd", "#styleinspo", "#reels", "#capsulewardrobe", "#contentideas"]
+    },
+    "lifestyle": {
+      "lines": [
+        "romanticizing the simple part of the day",
+        "a normal moment, but make it worth saving",
+        "slow mood, clean frame, good energy",
+        "proof that small moments can still feel cinematic",
+        "a little reset in video form",
+        "the kind of day detail that makes the feed feel alive",
+        "nothing forced, just a good frame",
+        "a soft reminder to notice the small things",
+        "ordinary day, better angle",
+        "quiet content that still says something"
+      ],
+      "tags": ["#lifestyle", "#vibe", "#daily", "#mood", "#reels", "#instadaily", "#aesthetic", "#contentideas"]
+    },
+    "onlyfans": {
+      "lines": [
+        "confident model energy with a clean tease",
+        "a soft dance moment made for replay",
+        "pretty face, strong presence, effortless movement",
+        "camera confidence with a little mystery",
+        "the kind of clip that feels personal without saying too much",
+        "soft glam, slow moves, and main character control",
+        "a model-style moment with fanpage energy",
+        "cute, confident, and impossible to scroll past",
+        "a little flirty, still polished, fully in control",
+        "the pose, the look, the movement, everything lands",
+        "dancing like the camera was made for her",
+        "simple outfit, confident energy, premium vibe"
+      ],
+      "tags": ["#model", "#dance", "#creator", "#fanpage", "#confidence", "#glam", "#reels", "#instamodel", "#viralreels", "#softtease"]
+    }
+  }
+}

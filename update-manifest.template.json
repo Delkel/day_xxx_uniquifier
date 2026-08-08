@@ -1,0 +1,16 @@
+{
+  "version": "2.5.1",
+  "notes": "Enki Agency Uniq 2.5.1",
+  "platforms": {
+    "macos": {
+      "type": "zip",
+      "url": "REPLACE_WITH_MACOS_RELEASE_ASSET_URL",
+      "sha256": "REPLACE_MAC_SHA256"
+    },
+    "windows": {
+      "type": "setup",
+      "url": "REPLACE_WITH_WINDOWS_SETUP_ASSET_URL",
+      "sha256": "REPLACE_WINDOWS_SHA256"
+    }
+  }
+}
