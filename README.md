@@ -1,6 +1,6 @@
 # Enki Agency Uniq для Mac
 
-Локальная Mac-версия уникализатора видео и фото. Версия 2.4.3 Update Fix работает на Qt-интерфейсе и использует отдельное Python-окружение для зависимостей. Движок ffmpeg делает crop/zoom, легкие изменения цвета, скорости, FPS, шума, пересобирает кодек и чистит метаданные.
+Локальная Mac-версия уникализатора видео и фото. Версия 2.4.4 Compression работает на Qt-интерфейсе и использует отдельное Python-окружение для зависимостей. Движок ffmpeg делает crop/zoom, легкие изменения цвета, скорости, FPS, шума, пересобирает кодек и чистит метаданные.
 
 ## Быстрая установка
 
@@ -34,7 +34,7 @@ xattr -dr com.apple.quarantine "/путь/к/day_xxx_uniquifier_macos"
 
 - Добавить видео копирует выбранные файлы в папку input.
 - Уникализировать создает готовые ролики в output/videos.
-- Версия 2.4.3 Update Fix публикуется через GitHub manifest, поэтому старые сборки с кнопкой обновления смогут скачать свежий архив.
+- Версия 2.4.4 Compression публикуется через GitHub manifest, поэтому старые сборки с кнопкой обновления смогут скачать свежий архив.
 - Режим instagram самый сильный и стоит по умолчанию.
 - Опция Каждую копию в отдельную папку удобна, если делаешь несколько копий одного исходника.
 - Опция След CapCut в MP4 добавляет CapCut-like метаданные контейнера. Это не настоящий экспорт через CapCut и не гарантия реакции алгоритмов, а технический профиль файла.
@@ -56,8 +56,8 @@ xattr -dr com.apple.quarantine "/путь/к/day_xxx_uniquifier_macos"
 
 \`\`\`json
 {
-  "version": "2.4.3",
-  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.4.3_update_fix_macos.zip",
+  "version": "2.4.4",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.4.4_compression_macos.zip",
   "notes": "Что изменилось в версии"
 }
 \`\`\`
