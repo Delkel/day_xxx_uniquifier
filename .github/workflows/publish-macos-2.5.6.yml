@@ -1,4 +1,4 @@
-name: Publish macOS 2.5.6
+name: Publish macOS updater
 
 on:
   push:
@@ -16,23 +16,31 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare package
         run: |
-          rm -rf mac256
-          mkdir mac256
-          ditto -x -k release/enki_agency_uniq_2.5.4_macos.zip mac256
-          python3 tools/patch_mac_256.py
-          APP_PY=$(find mac256 -name app.py -type f | head -1)
+          set -euo pipefail
+          rm -rf mac257
+          mkdir mac257
+          ditto -x -k release/enki_agency_uniq_2.5.6_macos.zip mac257
+          python3 tools/patch_mac_257.py
+          APP_PY=$(find mac257 -name app.py -type f | head -1)
           python3 -m py_compile "$APP_PY"
-          find mac256 -type f \( -name '*.command' -o -name 'bootstrap.sh' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
-          rm -f release/enki_agency_uniq_2.5.6_macos.zip
-          cd mac256
-          ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.5.6_macos.zip
+          grep -q 'APP_VERSION = "2.5.7"' "$APP_PY"
+          grep -q 'self.compact_update_btn.clicked.connect(self.check_updates)' "$APP_PY"
+          grep -q 'self.update_btn = self.compact_update_btn' "$APP_PY"
+          if grep -q 'self.update_btn.setEnabled' "$APP_PY"; then
+            echo 'Legacy updater reference found'
+            exit 1
+          fi
+          find mac257 -type f \( -name '*.command' -o -name 'bootstrap.sh' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
+          rm -f release/enki_agency_uniq_2.5.7_macos.zip
+          cd mac257
+          ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.5.7_macos.zip
           cd ..
-          test -s release/enki_agency_uniq_2.5.6_macos.zip
+          test -s release/enki_agency_uniq_2.5.7_macos.zip
       - name: Publish
         run: |
-          printf '%s\n' '{' '  "version": "2.5.6",' '  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.6_macos.zip",' '  "notes": "Enki Agency Uniq 2.5.6: выровнены кнопки боковой панели, сохранены Telegram-переход и быстрые обновления."' '}' > update-manifest.json
+          printf '%s\n' '{' '  "version": "2.5.7",' '  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.7_macos.zip",' '  "notes": "Enki Agency Uniq 2.5.7: исправлена кнопка обновления на macOS после переноса в нижний блок. Быстрый updater и закрытие Terminal сохранены."' '}' > update-manifest.json
           git config user.name github-actions-bot
           git config user.email actions@github.com
-          git add release/enki_agency_uniq_2.5.6_macos.zip update-manifest.json
-          git commit -m 'Publish Enki Agency Uniq 2.5.6 macOS'
+          git add release/enki_agency_uniq_2.5.7_macos.zip update-manifest.json
+          git commit -m 'Publish Enki Agency Uniq 2.5.7 macOS'
           git push
