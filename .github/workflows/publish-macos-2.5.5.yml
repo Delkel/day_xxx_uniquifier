@@ -1,0 +1,128 @@
+name: Publish macOS 2.5.5 aligned sidebar
+
+on:
+  push:
+    paths:
+      - 'MAC_255_TRIGGER.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare 2.5.5 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf mac255
+          mkdir -p mac255
+          ditto -x -k release/enki_agency_uniq_2.5.4_macos.zip mac255
+          APP_PY="$(find mac255 -name app.py -type f | head -1)"
+          test -n "$APP_PY"
+          export APP_PY
+
+          python3 <<'PY'
+          import os, re
+          from pathlib import Path
+
+          p = Path(os.environ['APP_PY'])
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', 'APP_VERSION = "2.5.5"', s, count=1)
+
+          # Align sidebar labels: no variable-width glyph prefixes.
+          replacements = {
+              '＋  Добавить видео': 'Добавить видео',
+              '＋  Добавить фото': 'Добавить фото',
+              '↻  Обновить очередь': 'Обновить очередь',
+              '⌂  Открыть папку исходников': 'Открыть папку исходников',
+              '⇩  Открыть папку результатов': 'Открыть папку результатов',
+              '⌫  Удалить готовые фото': 'Удалить готовые фото',
+              '⌫  Удалить готовые видео': 'Удалить готовые видео',
+              '↗  Перейти в команду': 'Перейти в команду',
+              '↻ Обновить': 'Обновить',
+          }
+          for old, new in replacements.items():
+              s = s.replace(old, new)
+
+          # Make every sidebar action identical in geometry and alignment.
+          old = "def side_button(self,text,fn): b=QPushButton(text,objectName='sideButton'); b.clicked.connect(fn); return b"
+          new = "def side_button(self,text,fn):\n        b=QPushButton(text,objectName='sideButton')\n        b.setFixedHeight(44)\n        b.setMinimumWidth(0)\n        b.setCursor(Qt.PointingHandCursor)\n        b.clicked.connect(fn)\n        return b"
+          if old in s:
+              s = s.replace(old, new, 1)
+          else:
+              # Fallback for already expanded method.
+              start = s.find('    def side_button(self,text,fn):')
+              end = s.find('\n    def ', start + 5)
+              if start >= 0 and end > start:
+                  block = "    def side_button(self,text,fn):\n        b=QPushButton(text,objectName='sideButton')\n        b.setFixedHeight(44)\n        b.setMinimumWidth(0)\n        b.setCursor(Qt.PointingHandCursor)\n        b.clicked.connect(fn)\n        return b\n"
+                  s = s[:start] + block + s[end:]
+
+          # Compact update button should look exactly like sidebar items.
+          s = s.replace('self.compact_update_btn.setObjectName("compactUpdateButton")', 'self.compact_update_btn.setObjectName("sideButton")')
+          s = s.replace('self.compact_update_btn.setFixedHeight(30)', 'self.compact_update_btn.setFixedHeight(44)')
+          s = s.replace('QPushButton("Обновить")', 'QPushButton("Обновить")')
+
+          # Normalize sidebar style so all rows have same font, padding and left edge.
+          side_rule = """
+        QPushButton#sideButton{
+            background:transparent;
+            border:0;
+            border-radius:9px;
+            padding:0 14px;
+            min-height:44px;
+            max-height:44px;
+            text-align:left;
+            font-size:14px;
+            font-weight:600;
+        }
+        QPushButton#sideButton:hover{background:#17130e;border:1px solid #3f2f1a}
+        QPushButton#sideButton:pressed{background:#21190f}
+"""
+          # Replace prior sideButton rule if present, otherwise append inside stylesheet.
+          s = re.sub(r'\s*QPushButton#sideButton\s*\{.*?\}\s*QPushButton#sideButton:hover\s*\{.*?\}', '\n' + side_rule, s, count=1, flags=re.S)
+          if 'min-height:44px' not in s:
+              pos = s.find('QMainWindow')
+              q1 = s.find('"""', pos)
+              q2 = s.find('"""', q1 + 3) if q1 >= 0 else -1
+              if q2 >= 0:
+                  s = s[:q2] + side_rule + s[q2:]
+
+          # Remove special compact update style so it cannot look larger than the menu.
+          s = re.sub(r'\s*QPushButton#compactUpdateButton\s*\{.*?\}\s*QPushButton#compactUpdateButton:hover\s*\{.*?\}', '\n', s, flags=re.S)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          python3 -m py_compile "$APP_PY"
+          grep -q 'APP_VERSION = "2.5.5"' "$APP_PY"
+          grep -q 'setFixedHeight(44)' "$APP_PY"
+          grep -q 'text-align:left' "$APP_PY"
+          grep -q 'Перейти в команду' "$APP_PY"
+          grep -q 'enki_agency_bot' "$APP_PY"
+
+          find mac255 -type f \( -name '*.command' -o -name 'bootstrap.sh' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
+          rm -f release/enki_agency_uniq_2.5.5_macos.zip
+          (cd mac255 && ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.5.5_macos.zip)
+          test -s release/enki_agency_uniq_2.5.5_macos.zip
+          shasum -a 256 release/enki_agency_uniq_2.5.5_macos.zip
+
+      - name: Publish 2.5.5 manifest
+        shell: bash
+        run: |
+          cat > update-manifest.json <<'JSON'
+          {
+            "version": "2.5.5",
+            "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.5_macos.zip",
+            "notes": "Enki Agency Uniq 2.5.5: все кнопки бокового меню приведены к одинаковой высоте и ширине, текст выровнен по одной вертикали. Кнопка обновления теперь визуально совпадает с остальными элементами меню."
+          }
+          JSON
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release/enki_agency_uniq_2.5.5_macos.zip update-manifest.json
+          git commit -m "Publish Enki Agency Uniq 2.5.5 aligned sidebar"
+          git push
