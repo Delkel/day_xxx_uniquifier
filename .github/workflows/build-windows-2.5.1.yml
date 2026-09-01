@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,14 +19,12 @@ jobs:
           choco install ffmpeg innosetup -y --no-progress
           python -m pip install --upgrade pip
           python -m pip install PySide6 Pillow pyinstaller
-      - name: Extract current Enki source
+      - name: Prepare Windows source
         shell: powershell
         run: |
           $archive = 'release/enki_agency_uniq_2.4.4_compression_macos.zip'
           if (!(Test-Path $archive)) { throw "Source archive missing: $archive" }
           python -c "import zipfile; zipfile.ZipFile(r'$archive').extractall('src')"
-          Write-Host 'Extracted files:'
-          Get-ChildItem src -Recurse | Select-Object -First 80 FullName
           $app = Get-ChildItem src -Recurse -File -Filter app.py | Select-Object -First 1
           $eng = Get-ChildItem src -Recurse -File -Filter uniquify_engine.py | Select-Object -First 1
           if (!$app -or !$eng) { throw 'Python sources not found in Enki package' }
@@ -35,12 +33,39 @@ jobs:
           Copy-Item $eng.FullName win/uniquify_engine.py
           $cap = Get-ChildItem src -Recurse -File -Filter captions.json | Select-Object -First 1
           if ($cap) { Copy-Item $cap.FullName win/captions.json } else { '{}' | Set-Content win/captions.json -Encoding UTF8 }
-          $png = Get-ChildItem src -Recurse -File -Filter '*.png' | Select-Object -First 1
+          $png = Get-ChildItem src -Recurse -File -Filter 'EnkiAgencyUniq.png' | Select-Object -First 1
+          if (!$png) { $png = Get-ChildItem src -Recurse -File -Filter '*.png' | Select-Object -First 1 }
           if ($png) { Copy-Item $png.FullName win/EnkiAgencyUniq.png }
-          $p='win/app.py'; $s=Get-Content $p -Raw
-          $s=$s -replace 'UPDATE_MANIFEST_URL\s*=\s*["''][^"'']*["'']','UPDATE_MANIFEST_URL = ""'
-          $s=$s -replace 'Проверить обновления','Обновления отключены'
-          Set-Content $p $s -Encoding UTF8
+          @'
+          from pathlib import Path
+          import re
+
+          p=Path('win/app.py')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('from PySide6.QtCore import Qt, QThread, Signal, QSize, QRectF, QPropertyAnimation, QEasingCurve', 'from PySide6.QtCore import Qt, QThread, Signal, QSize, QRectF, QPropertyAnimation, QEasingCurve, QUrl')
+          s=s.replace('from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor', 'from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QDesktopServices')
+          s=re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', 'APP_VERSION = "2.5.1"', s, count=1)
+          s=s.replace('ROOT = Path(os.environ.get("ENKI_UNIQ_ROOT", Path.home() / "Movies" / "Enki Agency Uniq"))', 'DEFAULT_MEDIA_ROOT = (Path.home() / "Videos" / "Enki Agency Uniq") if platform.system()=="Windows" else (Path.home() / "Movies" / "Enki Agency Uniq")\nROOT = Path(os.environ.get("ENKI_UNIQ_ROOT", DEFAULT_MEDIA_ROOT))')
+          s=s.replace('RESOURCES = Path(__file__).resolve().parent\nICON, LOGO = RESOURCES / "EnkiAgencyUniq.icns", RESOURCES / "EnkiAgencyUniq.png"', 'RESOURCES = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))\nICON = RESOURCES / ("EnkiAgencyUniq.ico" if platform.system()=="Windows" else "EnkiAgencyUniq.icns")\nLOGO = RESOURCES / "EnkiAgencyUniq.png"\nif platform.system()=="Windows" and getattr(sys, "frozen", False):\n    os.environ["PATH"] = str(Path(sys.executable).resolve().parent) + os.pathsep + os.environ.get("PATH","")')
+          s=re.sub(r'UPDATE_MANIFEST_URL\s*=\s*["\'][^"\']*["\']', 'UPDATE_MANIFEST_URL = ""', s, count=1)
+          s=s.replace('        side.addWidget(logo)\n        side.addSpacing(10)', '        logo.setCursor(Qt.PointingHandCursor)\n        logo.setToolTip("Enki Agency Telegram")\n        logo.mousePressEvent=lambda event:self.open_team()\n        side.addWidget(logo)\n        side.addSpacing(10)')
+          marker='        self.update_btn=None\n'
+          injected='        actions[-1] = ("\\u2b06  \\u041e\\u0431\\u043d\\u043e\\u0432\\u043b\\u0435\\u043d\\u0438\\u044f \\u043e\\u0442\\u043a\\u043b\\u044e\\u0447\\u0435\\u043d\\u044b", self.check_updates)\n        actions.insert(-1, ("\\u2197  \\u041f\\u0435\\u0440\\u0435\\u0439\\u0442\\u0438 \\u0432 \\u043a\\u043e\\u043c\\u0430\\u043d\\u0434\\u0443", self.open_team))\n        self.update_btn=None\n'
+          s=s.replace(marker, injected, 1)
+          s=re.sub(r'    def check_updates\(self\):\n.*?(?=    def on_update_checked\(self,m\):)', '    def check_updates(self):\n        QMessageBox.information(self, "Updates", "Automatic updates are disabled in this Windows build.")\n', s, count=1, flags=re.S)
+          old="    def open_path(self,path): subprocess.Popen(['open',str(path)])"
+          new="    def open_team(self):\n        QDesktopServices.openUrl(QUrl('https://t.me/enki_agency_bot'))\n\n    def open_path(self,path):\n        if platform.system()==\"Windows\": os.startfile(str(path))\n        elif platform.system()==\"Darwin\": subprocess.Popen(['open',str(path)])\n        else: subprocess.Popen(['xdg-open',str(path)])"
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          e=Path('win/uniquify_engine.py')
+          t=e.read_text(encoding='utf-8')
+          t=re.sub(r'GEO_POOL = \(.*?\n\)', 'GEO_POOL = (\n    "+40.7128-074.0060",\n    "+34.0522-118.2437",\n    "+25.7617-080.1918",\n    "+41.8781-087.6298",\n    "+29.7604-095.3698",\n    "+37.7749-122.4194",\n    "+32.7767-096.7970",\n    "+47.6062-122.3321",\n    "+42.3601-071.0589",\n    "+36.1699-115.1398",\n    "+33.7490-084.3880",\n    "+38.9072-077.0369",\n)', t, count=1, flags=re.S)
+          t=re.sub(r'return f"\{input_path\.stem\}_unique_\{index:02d\}_seed\{seed\}\.mp4"', 'return f"{input_path.stem}_{index:02d}_{seed % 1000000:06d}.mp4"', t, count=1)
+          t=re.sub(r'return f"\{input_path\.stem\}_unique_\{index:02d\}_seed\{seed\}\.jpg"', 'return f"{input_path.stem}_{index:02d}_{seed % 1000000:06d}.jpg"', t, count=1)
+          e.write_text(t,encoding='utf-8')
+          '@ | Set-Content patch_windows.py -Encoding ASCII
+          python patch_windows.py
           python -m py_compile win/app.py win/uniquify_engine.py
       - name: Build app
         shell: powershell
@@ -56,14 +81,17 @@ jobs:
           pyz=PYZ(a.pure)
           exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Enki Agency Uniq',console=False)
           coll=COLLECT(exe,a.binaries,a.datas,name='Enki Agency Uniq')
-          '@ | Set-Content EnkiAgencyUniq.spec -Encoding UTF8
+          '@ | Set-Content EnkiAgencyUniq.spec -Encoding ASCII
           pyinstaller --noconfirm --clean EnkiAgencyUniq.spec
           $dist='dist/Enki Agency Uniq'
-          Copy-Item (Get-Command ffmpeg.exe).Source "$dist/ffmpeg.exe" -Force
-          Copy-Item (Get-Command ffprobe.exe).Source "$dist/ffprobe.exe" -Force
+          $ffmpeg = Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffmpeg.exe | Select-Object -First 1
+          $ffprobe = Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffprobe.exe | Select-Object -First 1
+          if (!$ffmpeg -or !$ffprobe) { throw 'Real FFmpeg binaries not found' }
+          Copy-Item $ffmpeg.FullName "$dist/ffmpeg.exe" -Force
+          Copy-Item $ffprobe.FullName "$dist/ffprobe.exe" -Force
           $exe="$dist/Enki Agency Uniq.exe"
           if (!(Test-Path $exe)) { throw 'EXE not built' }
-          $p=Start-Process $exe -PassThru; Start-Sleep 5
+          $p=Start-Process $exe -PassThru; Start-Sleep 6
           if ($p.HasExited) { throw "App exited early: $($p.ExitCode)" }
           Stop-Process $p -Force
       - name: Build and test Setup
@@ -97,10 +125,10 @@ jobs:
           Name: "{autoprograms}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"
           Name: "{autodesktop}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"; Tasks: desktopicon
           [Tasks]
-          Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"; Flags: checkedonce
+          Name: "desktopicon"; Description: "Create desktop shortcut"; Flags: checkedonce
           [Run]
-          Filename: "{app}\Enki Agency Uniq.exe"; Description: "Запустить Enki Agency Uniq"; Flags: nowait postinstall skipifsilent
-          '@ | Set-Content installer.iss -Encoding UTF8
+          Filename: "{app}\Enki Agency Uniq.exe"; Description: "Launch Enki Agency Uniq"; Flags: nowait postinstall skipifsilent
+          '@ | Set-Content installer.iss -Encoding ASCII
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           $setup='installer/Enki_Agency_Uniq_2.5.1_Setup.exe'
           if (!(Test-Path $setup)) { throw 'Setup not built' }
@@ -108,7 +136,7 @@ jobs:
           if ($r.ExitCode -ne 0) { throw "Installer failed: $($r.ExitCode)" }
           $installed="$env:LOCALAPPDATA\Programs\Enki Agency Uniq\Enki Agency Uniq.exe"
           if (!(Test-Path $installed)) { throw 'Installed EXE missing' }
-          $p=Start-Process $installed -PassThru; Start-Sleep 5
+          $p=Start-Process $installed -PassThru; Start-Sleep 6
           if ($p.HasExited) { throw 'Installed app exited early' }
           Stop-Process $p -Force
           Get-FileHash $setup -Algorithm SHA256
