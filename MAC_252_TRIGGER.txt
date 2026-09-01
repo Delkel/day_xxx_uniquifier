@@ -1,0 +1,1 @@
+Publish Enki Agency Uniq 2.5.2 macOS updater via GitHub Actions.
