@@ -22,19 +22,21 @@ jobs:
       - name: Extract current Enki source
         shell: powershell
         run: |
-          Expand-Archive -Path 'release/enki_agency_uniq_2.4.4_compression_macos.zip' -DestinationPath src -Force
-          $app = Get-ChildItem src -Recurse -Filter app.py | Select-Object -First 1
-          $eng = Get-ChildItem src -Recurse -Filter uniquify_engine.py | Select-Object -First 1
-          if (!$app -or !$eng) { throw 'Python sources not found in macOS package' }
+          $archive = 'release/enki_agency_uniq_2.4.4_compression_macos.zip'
+          if (!(Test-Path $archive)) { throw "Source archive missing: $archive" }
+          python -c "import zipfile; zipfile.ZipFile(r'$archive').extractall('src')"
+          Write-Host 'Extracted files:'
+          Get-ChildItem src -Recurse | Select-Object -First 80 FullName
+          $app = Get-ChildItem src -Recurse -File -Filter app.py | Select-Object -First 1
+          $eng = Get-ChildItem src -Recurse -File -Filter uniquify_engine.py | Select-Object -First 1
+          if (!$app -or !$eng) { throw 'Python sources not found in Enki package' }
           New-Item -ItemType Directory -Force win | Out-Null
           Copy-Item $app.FullName win/app.py
           Copy-Item $eng.FullName win/uniquify_engine.py
-          $cap = Get-ChildItem src -Recurse -Filter captions.json | Select-Object -First 1
+          $cap = Get-ChildItem src -Recurse -File -Filter captions.json | Select-Object -First 1
           if ($cap) { Copy-Item $cap.FullName win/captions.json } else { '{}' | Set-Content win/captions.json -Encoding UTF8 }
-          $png = Get-ChildItem src -Recurse -Filter 'EnkiAgencyUniq.png' | Select-Object -First 1
-          if (!$png) { $png = Get-ChildItem src -Recurse -Filter '*.png' | Select-Object -First 1 }
+          $png = Get-ChildItem src -Recurse -File -Filter '*.png' | Select-Object -First 1
           if ($png) { Copy-Item $png.FullName win/EnkiAgencyUniq.png }
-          # Disable network updater in this standalone Windows build.
           $p='win/app.py'; $s=Get-Content $p -Raw
           $s=$s -replace 'UPDATE_MANIFEST_URL\s*=\s*["''][^"'']*["'']','UPDATE_MANIFEST_URL = ""'
           $s=$s -replace 'Проверить обновления','Обновления отключены'
@@ -46,8 +48,11 @@ jobs:
           Set-Location win
           @'
           # -*- mode: python ; coding: utf-8 -*-
+          import os
           from PyInstaller.utils.hooks import collect_submodules
-          a=Analysis(['app.py'],datas=[('captions.json','.')]+([('EnkiAgencyUniq.png','.')] if __import__('os').path.exists('EnkiAgencyUniq.png') else []),hiddenimports=collect_submodules('PySide6')+['uniquify_engine'])
+          datas=[('captions.json','.')]
+          if os.path.exists('EnkiAgencyUniq.png'): datas.append(('EnkiAgencyUniq.png','.'))
+          a=Analysis(['app.py'],datas=datas,hiddenimports=collect_submodules('PySide6')+['uniquify_engine'])
           pyz=PYZ(a.pure)
           exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Enki Agency Uniq',console=False)
           coll=COLLECT(exe,a.binaries,a.datas,name='Enki Agency Uniq')
@@ -69,7 +74,7 @@ jobs:
           #define MyAppName "Enki Agency Uniq"
           #define MyAppVersion "2.5.1"
           [Setup]
-          AppId={{A8F7E919-927B-4C51-8CDA-ENKI2501}}
+          AppId={{A8F7E919-927B-4C51-8CDA-250100000001}}
           AppName={#MyAppName}
           AppVersion={#MyAppVersion}
           AppPublisher=Enki Agency
