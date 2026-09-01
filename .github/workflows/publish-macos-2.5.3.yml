@@ -1,0 +1,183 @@
+name: Publish macOS 2.5.3 fast updater
+
+on:
+  push:
+    paths:
+      - 'MAC_253_TRIGGER.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare 2.5.3 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf mac253
+          mkdir -p mac253
+          ditto -x -k release/enki_agency_uniq_2.5.2_macos.zip mac253
+
+          APP_PY="$(find mac253 -name app.py -type f | head -1)"
+          BOOTSTRAP="$(find mac253 -name bootstrap.sh -type f | head -1)"
+          test -n "$APP_PY"
+          test -n "$BOOTSTRAP"
+          export APP_PY BOOTSTRAP
+
+          python3 <<'PY'
+          import os, re
+          from pathlib import Path
+
+          p = Path(os.environ['APP_PY'])
+          s = p.read_text(encoding='utf-8')
+
+          # Version.
+          s = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', 'APP_VERSION = "2.5.3"', s, count=1)
+
+          # Telegram helper/import/constant.
+          if 'import webbrowser' not in s:
+              s = s.replace('import urllib.request\n', 'import urllib.request\nimport webbrowser\n', 1)
+              if 'import webbrowser' not in s:
+                  s = 'import webbrowser\n' + s
+          if 'TEAM_URL = ' not in s and 'TELEGRAM_BOT_URL = ' not in s:
+              marker = 'UPDATE_MANIFEST_URL = '
+              pos = s.find(marker)
+              if pos >= 0:
+                  end = s.find('\n', pos)
+                  s = s[:end+1] + 'TEAM_URL = "https://t.me/enki_agency_bot"\n' + s[end+1:]
+              else:
+                  s = 'TEAM_URL = "https://t.me/enki_agency_bot"\n' + s
+          team_const = 'TEAM_URL' if 'TEAM_URL = ' in s else 'TELEGRAM_BOT_URL'
+
+          # Ensure open_team method exists on MainWindow.
+          if 'def open_team(self)' not in s:
+              anchor = '    def apply_style(self):'
+              if anchor not in s:
+                  anchor = '    def open_path(self,path):'
+              method = f'    def open_team(self):\n        webbrowser.open({team_const}, new=2)\n\n'
+              if anchor in s:
+                  s = s.replace(anchor, method + anchor, 1)
+              else:
+                  raise RuntimeError('Could not place open_team method')
+
+          # Make ENKI logo clickable regardless of QLabel formatting.
+          if 'logo.mousePressEvent' not in s:
+              marker = 'side.addWidget(logo)'
+              inject = (
+                  'logo.setCursor(Qt.PointingHandCursor)\n'
+                  '        logo.setToolTip("Перейти в команду")\n'
+                  '        logo.mousePressEvent=lambda event:self.open_team()\n'
+                  '        '
+              )
+              if marker in s:
+                  s = s.replace(marker, inject + marker, 1)
+              else:
+                  raise RuntimeError('Logo widget anchor not found')
+
+          # Ensure separate side button exists, immediately before update button when possible.
+          if '↗  Перейти в команду' not in s and 'Перейти в команду",self.open_team' not in s:
+              patterns = [
+                  '("⬆  Проверить обновления",self.check_updates)',
+                  '("⬆  Проверить обновление",self.check_updates)',
+                  '("Проверить обновления",self.check_updates)',
+              ]
+              done = False
+              for old in patterns:
+                  if old in s:
+                      s = s.replace(old, '("↗  Перейти в команду",self.open_team),' + old, 1)
+                      done = True
+                      break
+              if not done:
+                  raise RuntimeError('Update button anchor not found')
+
+          # Future macOS updates run silently in background: no Terminal window.
+          # Replace the Darwin branch of run_command_in_terminal with direct /bin/sh launch.
+          rx = re.compile(
+              r'def run_command_in_terminal\(path: Path\):\n'
+              r'    if platform\.system\(\)==["\']Darwin["\']:\n'
+              r'(?:        .*\n)+?'
+              r'    elif platform\.system\(\)==["\']Windows["\']:',
+              re.M,
+          )
+          repl = (
+              'def run_command_in_terminal(path: Path):\n'
+              '    if platform.system()=="Darwin":\n'
+              '        subprocess.Popen(["/bin/sh",str(path)], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n'
+              '    elif platform.system()=="Windows":'
+          )
+          s, n = rx.subn(repl, s, count=1)
+          if n == 0:
+              # Handle the compact source variant used by older Enki builds.
+              start = s.find('def run_command_in_terminal(path: Path):')
+              end = s.find('\n\nclass UpdateWorker', start)
+              if start >= 0 and end > start:
+                  block = '''def run_command_in_terminal(path: Path):\n    if platform.system()=="Darwin":\n        subprocess.Popen(["/bin/sh",str(path)], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n    elif platform.system()=="Windows":\n        subprocess.Popen(["powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-File",str(path)])\n    else:\n        subprocess.Popen(["sh",str(path)])\n'''
+                  s = s[:start] + block + s[end:]
+
+          # Future macOS updater must not reinstall Homebrew/Python/FFmpeg.
+          s = s.replace('/bin/bash "$S/Contents/Resources/bootstrap.sh"\n', '')
+          s = s.replace('mkdir -p "$D"; rm -rf "$A"; ditto "$S" "$A"', 'sleep 2\nmkdir -p "$D"; rm -rf "$A"; ditto "$S" "$A"')
+
+          p.write_text(s, encoding='utf-8')
+
+          # Fast bootstrap for upgrade from 2.5.2: if dependencies already exist,
+          # skip all Homebrew/uv work. Fresh installs still fall through to full setup.
+          b = Path(os.environ['BOOTSTRAP'])
+          bs = b.read_text(encoding='utf-8')
+          fast = r'''
+# Fast update path: existing working installation does not reinstall dependencies.
+if [ -x "$VENV_DIR/bin/python" ] \
+   && "$VENV_DIR/bin/python" -c 'import PySide6' >/dev/null 2>&1 \
+   && command -v ffmpeg >/dev/null 2>&1 \
+   && command -v ffprobe >/dev/null 2>&1; then
+  echo "Зависимости уже установлены — обновляю только Enki Agency Uniq."
+  exit 0
+fi
+'''
+          marker = 'echo "== Enki Agency Uniq: установка =="\n'
+          if 'Fast update path:' not in bs:
+              if marker in bs:
+                  bs = bs.replace(marker, marker + fast + '\n', 1)
+              else:
+                  bs = fast + '\n' + bs
+          b.write_text(bs, encoding='utf-8')
+          PY
+
+          python3 -m py_compile "$APP_PY"
+          chmod +x "$BOOTSTRAP"
+          find mac253 -type f \( -name '*.command' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
+
+          # Validate requested UI/update behavior in the actual packaged source.
+          grep -q 'APP_VERSION = "2.5.3"' "$APP_PY"
+          grep -q 'Перейти в команду' "$APP_PY"
+          grep -q 'enki_agency_bot' "$APP_PY"
+          grep -q 'logo.mousePressEvent' "$APP_PY"
+          grep -q 'start_new_session=True' "$APP_PY"
+          grep -q 'Fast update path:' "$BOOTSTRAP"
+
+          rm -f release/enki_agency_uniq_2.5.3_macos.zip
+          (cd mac253 && ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.5.3_macos.zip)
+          test -s release/enki_agency_uniq_2.5.3_macos.zip
+          shasum -a 256 release/enki_agency_uniq_2.5.3_macos.zip
+
+      - name: Publish 2.5.3 manifest
+        shell: bash
+        run: |
+          cat > update-manifest.json <<'JSON'
+          {
+            "version": "2.5.3",
+            "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.3_macos.zip",
+            "notes": "Enki Agency Uniq 2.5.3: исправлена кнопка «Перейти в команду» и кликабельный логотип ENKI. Обновление Mac ускорено: при уже установленных зависимостях Homebrew, FFmpeg и Python повторно не переустанавливаются; будущие обновления запускаются без окна Terminal."
+          }
+          JSON
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release/enki_agency_uniq_2.5.3_macos.zip update-manifest.json
+          git commit -m "Publish Enki Agency Uniq 2.5.3 fast macOS update"
+          git push
