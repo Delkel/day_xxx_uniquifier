@@ -1,0 +1,122 @@
+name: Publish macOS 2.5.4 compact updater
+
+on:
+  push:
+    paths:
+      - 'MAC_254_TRIGGER.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare 2.5.4 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf mac254
+          mkdir -p mac254
+          ditto -x -k release/enki_agency_uniq_2.5.3_macos.zip mac254
+          APP_PY="$(find mac254 -name app.py -type f | head -1)"
+          test -n "$APP_PY"
+          export APP_PY
+
+          python3 <<'PY'
+          import os, re
+          from pathlib import Path
+
+          p = Path(os.environ['APP_PY'])
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', 'APP_VERSION = "2.5.4"', s, count=1)
+
+          # Remove the large sidebar update action, keeping the team action.
+          patterns = [
+              r'\s*\(\s*["\'][^"\']*Проверить обновления[^"\']*["\']\s*,\s*self\.check_updates\s*\)\s*,?',
+              r'\s*\(\s*["\'][^"\']*Проверить обновление[^"\']*["\']\s*,\s*self\.check_updates\s*\)\s*,?',
+          ]
+          for pat in patterns:
+              s = re.sub(pat, '', s, count=1)
+
+          # Add a compact update button next to the version/footer area.
+          if 'self.compact_update_btn' not in s:
+              anchors = [
+                  'side.addWidget(QLabel(f"Версия {APP_VERSION}"))',
+                  "side.addWidget(QLabel(f'Версия {APP_VERSION}'))",
+                  'footer.addWidget(QLabel(f"Версия {APP_VERSION}"))',
+                  "footer.addWidget(QLabel(f'Версия {APP_VERSION}'))",
+              ]
+              inserted = False
+              for a in anchors:
+                  if a in s:
+                      block = a + '''\n        self.compact_update_btn = QPushButton("↻ Обновить")\n        self.compact_update_btn.setObjectName("compactUpdateButton")\n        self.compact_update_btn.setCursor(Qt.PointingHandCursor)\n        self.compact_update_btn.setToolTip("Проверить обновления")\n        self.compact_update_btn.setFixedHeight(30)\n        self.compact_update_btn.clicked.connect(self.check_updates)\n        side.addWidget(self.compact_update_btn)'''
+                      s = s.replace(a, block, 1)
+                      inserted = True
+                      break
+
+              if not inserted:
+                  # Fallback: place compact button immediately before creator line/footer stretch.
+                  candidates = [
+                      'side.addWidget(QLabel("by DuckyBruto · @day_xxx"))',
+                      "side.addWidget(QLabel('by DuckyBruto · @day_xxx'))",
+                      'side.addStretch()',
+                  ]
+                  for a in candidates:
+                      if a in s:
+                          block = '''self.compact_update_btn = QPushButton("↻ Обновить")\n        self.compact_update_btn.setObjectName("compactUpdateButton")\n        self.compact_update_btn.setCursor(Qt.PointingHandCursor)\n        self.compact_update_btn.setToolTip("Проверить обновления")\n        self.compact_update_btn.setFixedHeight(30)\n        self.compact_update_btn.clicked.connect(self.check_updates)\n        side.addWidget(self.compact_update_btn)\n        ''' + a
+                          s = s.replace(a, block, 1)
+                          inserted = True
+                          break
+
+              if not inserted:
+                  raise RuntimeError('Could not find footer anchor for compact update button')
+
+          # Give the compact footer button a subtle style if stylesheet exists.
+          if '#compactUpdateButton' not in s:
+              style_rule = '''\n            QPushButton#compactUpdateButton {\n                background: #11100d;\n                color: #d8cdbc;\n                border: 1px solid #4a3414;\n                border-radius: 9px;\n                padding: 4px 10px;\n                font-size: 12px;\n                font-weight: 600;\n            }\n            QPushButton#compactUpdateButton:hover {\n                border-color: #e6a93a;\n                color: #f3eadb;\n            }\n'''
+              # Insert before final stylesheet triple quote where possible.
+              pos = s.find('QMainWindow')
+              qpos = s.find('"""', pos)
+              if qpos >= 0:
+                  endq = s.find('"""', qpos + 3)
+                  if endq >= 0:
+                      s = s[:endq] + style_rule + s[endq:]
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          python3 -m py_compile "$APP_PY"
+          grep -q 'APP_VERSION = "2.5.4"' "$APP_PY"
+          grep -q 'self.compact_update_btn' "$APP_PY"
+          grep -q 'Перейти в команду' "$APP_PY"
+          grep -q 'enki_agency_bot' "$APP_PY"
+          if grep -q 'Проверить обновления.*self.check_updates' "$APP_PY"; then
+            echo 'Large sidebar update action still present'
+            exit 1
+          fi
+
+          find mac254 -type f \( -name '*.command' -o -name 'bootstrap.sh' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
+          rm -f release/enki_agency_uniq_2.5.4_macos.zip
+          (cd mac254 && ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.5.4_macos.zip)
+          test -s release/enki_agency_uniq_2.5.4_macos.zip
+          shasum -a 256 release/enki_agency_uniq_2.5.4_macos.zip
+
+      - name: Publish 2.5.4 manifest
+        shell: bash
+        run: |
+          cat > update-manifest.json <<'JSON'
+          {
+            "version": "2.5.4",
+            "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.4_macos.zip",
+            "notes": "Enki Agency Uniq 2.5.4: кнопка проверки обновлений убрана из основного меню и перенесена вниз к информации о версии как компактная кнопка. Освобождено место в боковой панели, чтобы элементы не налезали друг на друга."
+          }
+          JSON
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release/enki_agency_uniq_2.5.4_macos.zip update-manifest.json
+          git commit -m "Publish Enki Agency Uniq 2.5.4 compact updater"
+          git push
