@@ -1,5 +1,5 @@
 {
-  "version": "2.4.4",
-  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.4.4_compression_macos.zip",
-  "notes": "Enki Agency Uniq 2.4.4 Compression: обновленная macOS-сборка с режимом компрессии."
+  "version": "2.5.2",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.2_macos.zip",
+  "notes": "Enki Agency Uniq 2.5.2: добавлена кнопка «Перейти в команду», логотип ENKI открывает Telegram-бот @enki_agency_bot."
 }
