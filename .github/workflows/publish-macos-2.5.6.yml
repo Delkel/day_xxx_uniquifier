@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'MAC_256_TRIGGER_2.txt'
+      - '.github/workflows/publish-macos-2.5.6.yml'
   workflow_dispatch:
 
 permissions:
