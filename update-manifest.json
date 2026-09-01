@@ -1,5 +1,5 @@
 {
   "version": "2.5.7",
   "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.7_macos.zip",
-  "notes": "Enki Agency Uniq 2.5.7: исправлена кнопка «Обновить» на macOS. После переноса кнопки вниз updater обращался к старому элементу; теперь нажатие снова запускает проверку GitHub. Быстрый updater и закрытие Terminal сохранены."
+  "notes": "Enki Agency Uniq 2.5.7: исправлена кнопка обновления на macOS после переноса в нижний блок. Быстрый updater и закрытие Terminal сохранены."
 }
