@@ -3,7 +3,7 @@ name: Publish macOS 2.5.6
 on:
   push:
     paths:
-      - 'MAC_256_TRIGGER.txt'
+      - 'MAC_256_TRIGGER_2.txt'
   workflow_dispatch:
 
 permissions:
@@ -14,89 +14,25 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build macOS 2.5.6 package
-        shell: bash
+      - name: Prepare package
         run: |
-          set -euo pipefail
           rm -rf mac256
           mkdir mac256
           ditto -x -k release/enki_agency_uniq_2.5.4_macos.zip mac256
-          APP_PY="$(find mac256 -name app.py -type f | head -1)"
-          test -n "$APP_PY"
-          export APP_PY
-          python3 <<'PY'
-          import os,re
-          from pathlib import Path
-          p=Path(os.environ['APP_PY'])
-          s=p.read_text(encoding='utf-8')
-          s=re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']','APP_VERSION = "2.5.6"',s,count=1)
-          repl={
-            '＋  Добавить видео':'Добавить видео','＋  Добавить фото':'Добавить фото','↻  Обновить очередь':'Обновить очередь',
-            '⌂  Открыть папку исходников':'Открыть папку исходников','⇩  Открыть папку результатов':'Открыть папку результатов',
-            '⌫  Удалить готовые фото':'Удалить готовые фото','⌫  Удалить готовые видео':'Удалить готовые видео',
-            '↗  Перейти в команду':'Перейти в команду','↻ Обновить':'Обновить'
-          }
-          for a,b in repl.items(): s=s.replace(a,b)
-          s=s.replace('self.compact_update_btn.setObjectName("compactUpdateButton")','self.compact_update_btn.setObjectName("sideButton")')
-          s=s.replace('self.compact_update_btn.setFixedHeight(30)','self.compact_update_btn.setFixedHeight(44)')
-          start=s.find('    def side_button(self,text,fn):')
-          if start>=0:
-              end=s.find('\n    def ',start+5)
-              if end>start:
-                  block="""    def side_button(self,text,fn):
-        b=QPushButton(text,objectName='sideButton')
-        b.setFixedHeight(44)
-        b.setCursor(Qt.PointingHandCursor)
-        b.clicked.connect(fn)
-        return b
-"""
-                  s=s[:start]+block+s[end:]
-          style="""
-        QPushButton#sideButton {
-            background: transparent;
-            border: 1px solid transparent;
-            border-radius: 9px;
-            padding: 0 14px;
-            min-height: 44px;
-            max-height: 44px;
-            text-align: left;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        QPushButton#sideButton:hover { background:#17130e; border-color:#3f2f1a; }
-        QPushButton#sideButton:pressed { background:#21190f; }
-"""
-          s=re.sub(r'\s*QPushButton#sideButton\s*\{.*?\}\s*QPushButton#sideButton:hover\s*\{.*?\}', '\n'+style, s, count=1, flags=re.S)
-          if 'min-height: 44px' not in s:
-              q1=s.find('"""',s.find('def apply_style'))
-              q2=s.find('"""',q1+3) if q1>=0 else -1
-              if q2>=0: s=s[:q2]+style+s[q2:]
-          s=re.sub(r'\s*QPushButton#compactUpdateButton\s*\{.*?\}\s*QPushButton#compactUpdateButton:hover\s*\{.*?\}', '\n', s, flags=re.S)
-          p.write_text(s,encoding='utf-8')
-          PY
+          python3 tools/patch_mac_256.py
+          APP_PY=$(find mac256 -name app.py -type f | head -1)
           python3 -m py_compile "$APP_PY"
-          grep -q 'APP_VERSION = "2.5.6"' "$APP_PY"
-          grep -q 'Перейти в команду' "$APP_PY"
-          grep -q 'enki_agency_bot' "$APP_PY"
-          grep -q 'setFixedHeight(44)' "$APP_PY"
           find mac256 -type f \( -name '*.command' -o -name 'bootstrap.sh' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
           rm -f release/enki_agency_uniq_2.5.6_macos.zip
-          (cd mac256 && ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.5.6_macos.zip)
+          cd mac256
+          ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.5.6_macos.zip
+          cd ..
           test -s release/enki_agency_uniq_2.5.6_macos.zip
-
-      - name: Publish macOS 2.5.6
-        shell: bash
+      - name: Publish
         run: |
-          cat > update-manifest.json <<'JSON'
-          {
-            "version": "2.5.6",
-            "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.6_macos.zip",
-            "notes": "Enki Agency Uniq 2.5.6: выровнены все кнопки боковой панели, сохранены переход в Telegram и быстрый updater без повторной установки зависимостей."
-          }
-          JSON
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '%s\n' '{' '  "version": "2.5.6",' '  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.6_macos.zip",' '  "notes": "Enki Agency Uniq 2.5.6: выровнены кнопки боковой панели, сохранены Telegram-переход и быстрые обновления."' '}' > update-manifest.json
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
           git add release/enki_agency_uniq_2.5.6_macos.zip update-manifest.json
-          git commit -m "Publish Enki Agency Uniq 2.5.6 macOS"
+          git commit -m 'Publish Enki Agency Uniq 2.5.6 macOS'
           git push
