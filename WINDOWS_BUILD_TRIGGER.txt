@@ -1,0 +1,1 @@
+Trigger standalone Windows 2.5.1 build after workflow registration on main.
