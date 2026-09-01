@@ -1,5 +1,5 @@
 {
-  "version": "2.5.3",
-  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.3_macos.zip",
-  "notes": "Enki Agency Uniq 2.5.3: исправлена кнопка «Перейти в команду» и кликабельный логотип ENKI. Обновление Mac ускорено: существующие Homebrew, FFmpeg и Python повторно не устанавливаются; будущие обновления запускаются без окна Terminal."
+  "version": "2.5.4",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.4_macos.zip",
+  "notes": "Enki Agency Uniq 2.5.4: кнопка проверки обновлений убрана из основного меню и перенесена вниз к информации о версии как компактная кнопка. Освобождено место в боковой панели, чтобы элементы не налезали друг на друга."
 }
