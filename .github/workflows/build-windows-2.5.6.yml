@@ -1,0 +1,151 @@
+name: Build Windows 2.5.6
+
+on:
+  push:
+    paths:
+      - 'WIN_256_TRIGGER.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install build tools
+        shell: powershell
+        run: |
+          choco install ffmpeg innosetup -y --no-progress
+          python -m pip install --upgrade pip
+          python -m pip install PySide6 Pillow pyinstaller
+      - name: Prepare source
+        shell: powershell
+        run: |
+          $archive='release/enki_agency_uniq_2.5.6_macos.zip'
+          if (!(Test-Path $archive)) { throw "Missing $archive" }
+          python -c "import zipfile; zipfile.ZipFile(r'$archive').extractall('src')"
+          New-Item -ItemType Directory -Force win | Out-Null
+          $app=Get-ChildItem src -Recurse -File -Filter app.py | Select-Object -First 1
+          $eng=Get-ChildItem src -Recurse -File -Filter uniquify_engine.py | Select-Object -First 1
+          if (!$app -or !$eng) { throw 'Sources not found' }
+          Copy-Item $app.FullName win/app.py
+          Copy-Item $eng.FullName win/uniquify_engine.py
+          $cap=Get-ChildItem src -Recurse -File -Filter captions.json | Select-Object -First 1
+          if ($cap) { Copy-Item $cap.FullName win/captions.json } else { '{}' | Set-Content win/captions.json -Encoding UTF8 }
+          $png=Get-ChildItem src -Recurse -File -Filter EnkiAgencyUniq.png | Select-Object -First 1
+          if (!$png) { $png=Get-ChildItem src -Recurse -File -Filter *.png | Select-Object -First 1 }
+          if ($png) { Copy-Item $png.FullName win/EnkiAgencyUniq.png }
+          python tools/patch_windows_256.py
+          python -m py_compile win/app.py win/uniquify_engine.py
+      - name: Build application
+        shell: powershell
+        run: |
+          Set-Location win
+          @'
+          # -*- mode: python ; coding: utf-8 -*-
+          import os
+          from PyInstaller.utils.hooks import collect_submodules
+          datas=[('captions.json','.')]
+          if os.path.exists('EnkiAgencyUniq.png'): datas.append(('EnkiAgencyUniq.png','.'))
+          a=Analysis(['app.py'],datas=datas,hiddenimports=collect_submodules('PySide6')+['uniquify_engine'])
+          pyz=PYZ(a.pure)
+          exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Enki Agency Uniq',console=False)
+          coll=COLLECT(exe,a.binaries,a.datas,name='Enki Agency Uniq')
+          '@ | Set-Content EnkiAgencyUniq.spec -Encoding UTF8
+          pyinstaller --noconfirm --clean EnkiAgencyUniq.spec
+          $dist='dist/Enki Agency Uniq'
+          $ffmpeg=Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffmpeg.exe | Select-Object -First 1
+          $ffprobe=Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffprobe.exe | Select-Object -First 1
+          if (!$ffmpeg -or !$ffprobe) { throw 'FFmpeg missing' }
+          Copy-Item $ffmpeg.FullName "$dist/ffmpeg.exe" -Force
+          Copy-Item $ffprobe.FullName "$dist/ffprobe.exe" -Force
+          $exe="$dist/Enki Agency Uniq.exe"
+          $p=Start-Process $exe -PassThru
+          Start-Sleep 6
+          if ($p.HasExited) { throw "App exited early: $($p.ExitCode)" }
+          Stop-Process $p -Force
+      - name: Build installer
+        shell: powershell
+        run: |
+          Set-Location win
+          @'
+          #define MyAppName "Enki Agency Uniq"
+          #define MyAppVersion "2.5.6"
+          [Setup]
+          AppId={{A8F7E919-927B-4C51-8CDA-250100000001}}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppPublisher=Enki Agency
+          DefaultDirName={localappdata}\Programs\Enki Agency Uniq
+          DefaultGroupName=Enki Agency Uniq
+          OutputDir=installer
+          OutputBaseFilename=Enki_Agency_Uniq_2.5.6_Setup
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          PrivilegesRequired=lowest
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          WizardStyle=modern
+          CloseApplications=yes
+          RestartApplications=yes
+          DisableProgramGroupPage=yes
+          [Files]
+          Source: "dist\Enki Agency Uniq\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          [Icons]
+          Name: "{autoprograms}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"
+          Name: "{autodesktop}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"; Tasks: desktopicon
+          [Tasks]
+          Name: "desktopicon"; Description: "Create desktop shortcut"; Flags: checkedonce
+          [Run]
+          Filename: "{app}\Enki Agency Uniq.exe"; Description: "Launch Enki Agency Uniq"; Flags: nowait postinstall skipifsilent
+          '@ | Set-Content installer.iss -Encoding UTF8
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
+          $setup='installer/Enki_Agency_Uniq_2.5.6_Setup.exe'
+          if (!(Test-Path $setup)) { throw 'Installer missing' }
+          $r=Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($r.ExitCode -ne 0) { throw "Install failed $($r.ExitCode)" }
+          $installed="$env:LOCALAPPDATA\Programs\Enki Agency Uniq\Enki Agency Uniq.exe"
+          if (!(Test-Path $installed)) { throw 'Installed app missing' }
+          $p=Start-Process $installed -PassThru
+          Start-Sleep 6
+          if ($p.HasExited) { throw 'Installed app exited early' }
+          Stop-Process $p -Force
+          Get-FileHash $setup -Algorithm SHA256
+      - name: Publish Windows installer and manifest
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $setup='win/installer/Enki_Agency_Uniq_2.5.6_Setup.exe'
+          gh release view v2.5.6 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v2.5.6 --title 'Enki Agency Uniq 2.5.6' --notes 'macOS and Windows release 2.5.6' }
+          gh release upload v2.5.6 $setup --clobber
+          @'
+          {
+            "version": "2.5.6",
+            "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.6_macos.zip",
+            "notes": "Enki Agency Uniq 2.5.6: выровненный интерфейс, Telegram-кнопка и рабочие обновления для macOS и Windows.",
+            "platforms": {
+              "macos": {"url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.6_macos.zip"},
+              "windows": {"url": "https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.5.6/Enki_Agency_Uniq_2.5.6_Setup.exe", "type": "setup"}
+            }
+          }
+          '@ | Set-Content update-manifest.json -Encoding UTF8
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add update-manifest.json
+          git commit -m 'Publish Windows 2.5.6 updater manifest'
+          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Enki_Agency_Uniq_2.5.6_Setup
+          path: win/installer/Enki_Agency_Uniq_2.5.6_Setup.exe
+          if-no-files-found: error
+          retention-days: 30
