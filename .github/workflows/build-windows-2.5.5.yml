@@ -1,0 +1,222 @@
+name: Build Windows 2.5.5 aligned UI
+on:
+  push:
+    paths:
+      - 'WIN_255_TRIGGER.txt'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+
+      - name: Install tools
+        shell: powershell
+        run: |
+          choco install ffmpeg innosetup -y --no-progress
+          python -m pip install --upgrade pip
+          python -m pip install PySide6 Pillow pyinstaller
+
+      - name: Prepare Windows 2.5.5 source
+        shell: powershell
+        run: |
+          $archive = 'release/enki_agency_uniq_2.5.4_macos.zip'
+          if (!(Test-Path $archive)) { throw "Source archive missing: $archive" }
+          python -c "import zipfile; zipfile.ZipFile(r'$archive').extractall('src')"
+          $app = Get-ChildItem src -Recurse -File -Filter app.py | Select-Object -First 1
+          $eng = Get-ChildItem src -Recurse -File -Filter uniquify_engine.py | Select-Object -First 1
+          if (!$app -or !$eng) { throw 'Python sources not found' }
+          New-Item -ItemType Directory -Force win | Out-Null
+          Copy-Item $app.FullName win/app.py
+          Copy-Item $eng.FullName win/uniquify_engine.py
+          $cap = Get-ChildItem src -Recurse -File -Filter captions.json | Select-Object -First 1
+          if ($cap) { Copy-Item $cap.FullName win/captions.json } else { '{}' | Set-Content win/captions.json -Encoding UTF8 }
+          $png = Get-ChildItem src -Recurse -File -Filter 'EnkiAgencyUniq.png' | Select-Object -First 1
+          if (!$png) { $png = Get-ChildItem src -Recurse -File -Filter '*.png' | Select-Object -First 1 }
+          if ($png) { Copy-Item $png.FullName win/EnkiAgencyUniq.png }
+
+          @'
+          from pathlib import Path
+          import re
+
+          p=Path('win/app.py')
+          s=p.read_text(encoding='utf-8')
+
+          s=re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', 'APP_VERSION = "2.5.5"', s, count=1)
+
+          if 'QUrl' not in s.split('\n', 40)[0:40]:
+              s=s.replace('from PySide6.QtCore import ', 'from PySide6.QtCore import QUrl, ', 1)
+          if 'QDesktopServices' not in s:
+              s=s.replace('from PySide6.QtGui import ', 'from PySide6.QtGui import QDesktopServices, ', 1)
+
+          if 'DEFAULT_MEDIA_ROOT' not in s:
+              s=s.replace('ROOT = Path(os.environ.get("ENKI_UNIQ_ROOT", Path.home() / "Movies" / "Enki Agency Uniq"))', 'DEFAULT_MEDIA_ROOT = (Path.home() / "Videos" / "Enki Agency Uniq") if platform.system()=="Windows" else (Path.home() / "Movies" / "Enki Agency Uniq")\nROOT = Path(os.environ.get("ENKI_UNIQ_ROOT", DEFAULT_MEDIA_ROOT))')
+
+          s=s.replace('RESOURCES = Path(__file__).resolve().parent', 'RESOURCES = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))')
+          if 'if platform.system()=="Windows" and getattr(sys, "frozen", False):' not in s:
+              anchor='LOGO = RESOURCES / "EnkiAgencyUniq.png"'
+              if anchor in s:
+                  s=s.replace(anchor, anchor+'\nif platform.system()=="Windows" and getattr(sys, "frozen", False):\n    os.environ["PATH"] = str(Path(sys.executable).resolve().parent) + os.pathsep + os.environ.get("PATH","")', 1)
+
+          s=re.sub(r'UPDATE_MANIFEST_URL\s*=\s*["\'][^"\']*["\']', 'UPDATE_MANIFEST_URL = ""', s, count=1)
+
+          # Windows-safe Telegram opener.
+          if 'def open_team(self)' in s:
+              s=re.sub(r'    def open_team\(self\):\n(?:        .*\n)+?(?=\n    def )', '    def open_team(self):\n        QDesktopServices.openUrl(QUrl("https://t.me/enki_agency_bot"))\n', s, count=1)
+          else:
+              anchor='    def open_path(self,path):'
+              if anchor in s:
+                  s=s.replace(anchor, '    def open_team(self):\n        QDesktopServices.openUrl(QUrl("https://t.me/enki_agency_bot"))\n\n'+anchor, 1)
+
+          # Cross-platform folder opener.
+          s=re.sub(r'    def open_path\(self,path\):[^\n]*', '    def open_path(self,path):\n        if platform.system()=="Windows": os.startfile(str(path))\n        elif platform.system()=="Darwin": subprocess.Popen(["open",str(path)])\n        else: subprocess.Popen(["xdg-open",str(path)])', s, count=1)
+
+          # Clickable logo on Windows too.
+          if 'logo.mousePressEvent' not in s:
+              anchor='side.addWidget(logo)'
+              if anchor in s:
+                  s=s.replace(anchor, 'logo.setCursor(Qt.PointingHandCursor)\n        logo.setToolTip("Перейти в команду")\n        logo.mousePressEvent=lambda event:self.open_team()\n        '+anchor, 1)
+
+          # Ensure team button exists.
+          if 'Перейти в команду' not in s:
+              for old in ['("Проверить обновления",self.check_updates)', '("Обновить",self.check_updates)']:
+                  if old in s:
+                      s=s.replace(old, '("Перейти в команду",self.open_team),'+old, 1)
+                      break
+
+          # Normalize sidebar labels: no uneven pictograms; text starts on one vertical line.
+          replacements = {
+              '＋  Добавить видео':'Добавить видео', '+  Добавить видео':'Добавить видео',
+              '＋  Добавить фото':'Добавить фото', '+  Добавить фото':'Добавить фото',
+              '↻  Обновить очередь':'Обновить очередь', '⟳  Обновить очередь':'Обновить очередь',
+              '⌂  Открыть папку исходников':'Открыть папку исходников',
+              '⇩  Открыть папку результатов':'Открыть папку результатов', '↓  Открыть папку результатов':'Открыть папку результатов',
+              '⌫  Удалить готовые фото':'Удалить готовые фото',
+              '⌫  Удалить готовые видео':'Удалить готовые видео',
+              '↗  Перейти в команду':'Перейти в команду',
+              '⬆  Проверить обновления':'Проверить обновления',
+              '↻ Обновить':'Обновить', '↻  Обновить':'Обновить',
+          }
+          for a,b in replacements.items(): s=s.replace(a,b)
+
+          # Give every sidebar action the same geometry and left alignment.
+          # Patch the common side_button factory without changing behavior.
+          m=re.search(r'(    def side_button\(self,.*?\n)(.*?)(?=\n    def )', s, flags=re.S)
+          if m:
+              block=m.group(0)
+              if 'setFixedHeight(44)' not in block:
+                  lines=block.splitlines()
+                  insert_at=1
+                  for i,line in enumerate(lines):
+                      if 'QPushButton' in line and '=' in line:
+                          insert_at=i+1; break
+                  indent='        '
+                  lines[insert_at:insert_at]=[
+                      indent+'b.setFixedHeight(44)',
+                      indent+'b.setMinimumWidth(220)',
+                      indent+'b.setCursor(Qt.PointingHandCursor)',
+                      indent+'b.setStyleSheet(b.styleSheet() + "text-align:left; padding-left:18px;")',
+                  ]
+                  s=s[:m.start()]+"\n".join(lines)+s[m.end():]
+
+          # Compact update button should not stand out or have a different height.
+          s=s.replace('self.compact_update_btn.setFixedHeight(30)', 'self.compact_update_btn.setFixedHeight(44)')
+          s=s.replace('self.compact_update_btn.setFixedHeight(32)', 'self.compact_update_btn.setFixedHeight(44)')
+          if 'self.compact_update_btn' in s:
+              s=s.replace('self.compact_update_btn.clicked.connect(self.check_updates)', 'self.compact_update_btn.setText("Обновления отключены")\n        self.compact_update_btn.setEnabled(False)')
+
+          # Disable Windows network updater so it can never fetch the macOS package.
+          s=re.sub(r'    def check_updates\(self\):\n.*?(?=\n    def )', '    def check_updates(self):\n        QMessageBox.information(self, "Обновления", "Автоматические обновления для Windows будут добавлены отдельно.")\n', s, count=1, flags=re.S)
+
+          p.write_text(s,encoding='utf-8')
+          '@ | Set-Content patch_windows.py -Encoding UTF8
+          python patch_windows.py
+          python -m py_compile win/app.py win/uniquify_engine.py
+
+      - name: Build app
+        shell: powershell
+        run: |
+          Set-Location win
+          @'
+          # -*- mode: python ; coding: utf-8 -*-
+          import os
+          from PyInstaller.utils.hooks import collect_submodules
+          datas=[('captions.json','.')]
+          if os.path.exists('EnkiAgencyUniq.png'): datas.append(('EnkiAgencyUniq.png','.'))
+          a=Analysis(['app.py'],datas=datas,hiddenimports=collect_submodules('PySide6')+['uniquify_engine'])
+          pyz=PYZ(a.pure)
+          exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Enki Agency Uniq',console=False)
+          coll=COLLECT(exe,a.binaries,a.datas,name='Enki Agency Uniq')
+          '@ | Set-Content EnkiAgencyUniq.spec -Encoding UTF8
+          pyinstaller --noconfirm --clean EnkiAgencyUniq.spec
+          $dist='dist/Enki Agency Uniq'
+          $ffmpeg = Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffmpeg.exe | Select-Object -First 1
+          $ffprobe = Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffprobe.exe | Select-Object -First 1
+          if (!$ffmpeg -or !$ffprobe) { throw 'FFmpeg binaries not found' }
+          Copy-Item $ffmpeg.FullName "$dist/ffmpeg.exe" -Force
+          Copy-Item $ffprobe.FullName "$dist/ffprobe.exe" -Force
+          $exe="$dist/Enki Agency Uniq.exe"
+          if (!(Test-Path $exe)) { throw 'EXE not built' }
+          $p=Start-Process $exe -PassThru; Start-Sleep 6
+          if ($p.HasExited) { throw "App exited early: $($p.ExitCode)" }
+          Stop-Process $p -Force
+
+      - name: Build and test Setup
+        shell: powershell
+        run: |
+          Set-Location win
+          @'
+          #define MyAppName "Enki Agency Uniq"
+          #define MyAppVersion "2.5.5"
+          [Setup]
+          AppId={{A8F7E919-927B-4C51-8CDA-250100000001}}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppPublisher=Enki Agency
+          DefaultDirName={localappdata}\Programs\Enki Agency Uniq
+          DefaultGroupName=Enki Agency Uniq
+          OutputDir=installer
+          OutputBaseFilename=Enki_Agency_Uniq_2.5.5_Setup
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          PrivilegesRequired=lowest
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          WizardStyle=modern
+          CloseApplications=yes
+          RestartApplications=yes
+          DisableProgramGroupPage=yes
+          [Files]
+          Source: "dist\Enki Agency Uniq\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          [Icons]
+          Name: "{autoprograms}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"
+          Name: "{autodesktop}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"; Tasks: desktopicon
+          [Tasks]
+          Name: "desktopicon"; Description: "Create desktop shortcut"; Flags: checkedonce
+          [Run]
+          Filename: "{app}\Enki Agency Uniq.exe"; Description: "Launch Enki Agency Uniq"; Flags: nowait postinstall skipifsilent
+          '@ | Set-Content installer.iss -Encoding UTF8
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
+          $setup='installer/Enki_Agency_Uniq_2.5.5_Setup.exe'
+          if (!(Test-Path $setup)) { throw 'Setup not built' }
+          $r=Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($r.ExitCode -ne 0) { throw "Installer failed: $($r.ExitCode)" }
+          $installed="$env:LOCALAPPDATA\Programs\Enki Agency Uniq\Enki Agency Uniq.exe"
+          if (!(Test-Path $installed)) { throw 'Installed EXE missing' }
+          $p=Start-Process $installed -PassThru; Start-Sleep 6
+          if ($p.HasExited) { throw 'Installed app exited early' }
+          Stop-Process $p -Force
+          Get-FileHash $setup -Algorithm SHA256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Enki_Agency_Uniq_2.5.5_Setup
+          path: win/installer/Enki_Agency_Uniq_2.5.5_Setup.exe
+          if-no-files-found: error
+          retention-days: 30
