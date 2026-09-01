@@ -1,5 +1,5 @@
 {
-  "version": "2.5.4",
-  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.4_macos.zip",
-  "notes": "Enki Agency Uniq 2.5.4: кнопка проверки обновлений убрана из основного меню и перенесена вниз к информации о версии как компактная кнопка. Освобождено место в боковой панели, чтобы элементы не налезали друг на друга."
+  "version": "2.5.6",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.6_macos.zip",
+  "notes": "Enki Agency Uniq 2.5.6: выровнены кнопки боковой панели, сохранены Telegram-переход и быстрые обновления."
 }
