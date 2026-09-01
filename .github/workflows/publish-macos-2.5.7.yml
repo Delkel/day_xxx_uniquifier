@@ -1,0 +1,89 @@
+name: Publish macOS 2.5.7 updater fix
+
+on:
+  push:
+    paths:
+      - 'MAC_257_TRIGGER.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare macOS 2.5.7
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf mac257
+          mkdir mac257
+          ditto -x -k release/enki_agency_uniq_2.5.6_macos.zip mac257
+          APP_PY="$(find mac257 -name app.py -type f | head -1)"
+          test -n "$APP_PY"
+          export APP_PY
+
+          python3 <<'PY'
+          import os, re
+          from pathlib import Path
+
+          p = Path(os.environ['APP_PY'])
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', 'APP_VERSION = "2.5.7"', s, count=1)
+
+          # The old updater methods still referenced self.update_btn after the
+          # visible button had been moved to self.compact_update_btn. That made
+          # a click raise before any dialog appeared. Point all updater state
+          # changes at the actual visible button.
+          s = s.replace('self.update_btn.setEnabled(False)', 'self.compact_update_btn.setEnabled(False)')
+          s = s.replace('self.update_btn.setEnabled(True)', 'self.compact_update_btn.setEnabled(True)')
+
+          # Ensure the compact button is really connected and also provide the
+          # legacy alias for any remaining updater code paths.
+          marker = 'self.compact_update_btn.clicked.connect(self.check_updates)'
+          if marker in s and 'self.update_btn = self.compact_update_btn' not in s:
+              s = s.replace(marker, marker + '\n        self.update_btn = self.compact_update_btn', 1)
+          elif 'self.compact_update_btn' in s and marker not in s:
+              # Re-enable it if a previous styling patch accidentally removed
+              # the signal connection.
+              anchor = 'side.addWidget(self.compact_update_btn)'
+              if anchor in s:
+                  s = s.replace(anchor, 'self.compact_update_btn.clicked.connect(self.check_updates)\n        self.update_btn = self.compact_update_btn\n        ' + anchor, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          python3 -m py_compile "$APP_PY"
+          grep -q 'APP_VERSION = "2.5.7"' "$APP_PY"
+          grep -q 'self.compact_update_btn.clicked.connect(self.check_updates)' "$APP_PY"
+          grep -q 'self.update_btn = self.compact_update_btn' "$APP_PY"
+          if grep -q 'self.update_btn.setEnabled' "$APP_PY"; then
+            echo 'Legacy updater button reference still present'
+            exit 1
+          fi
+          grep -q 'enki_agency_bot' "$APP_PY"
+
+          find mac257 -type f \( -name '*.command' -o -name 'bootstrap.sh' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
+          rm -f release/enki_agency_uniq_2.5.7_macos.zip
+          (cd mac257 && ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.5.7_macos.zip)
+          test -s release/enki_agency_uniq_2.5.7_macos.zip
+          shasum -a 256 release/enki_agency_uniq_2.5.7_macos.zip
+
+      - name: Publish macOS 2.5.7
+        shell: bash
+        run: |
+          cat > update-manifest.json <<'JSON'
+          {
+            "version": "2.5.7",
+            "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.5.7_macos.zip",
+            "notes": "Enki Agency Uniq 2.5.7: исправлена кнопка «Обновить» на macOS. После переноса кнопки вниз updater обращался к старому элементу; теперь нажатие снова запускает проверку GitHub. Быстрый updater и закрытие Terminal сохранены."
+          }
+          JSON
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release/enki_agency_uniq_2.5.7_macos.zip update-manifest.json
+          git commit -m "Publish Enki Agency Uniq 2.5.7 macOS updater fix"
+          git push
