@@ -37,8 +37,12 @@ jobs:
           s = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', 'APP_VERSION = "2.5.3"', s, count=1)
 
           if "import webbrowser" not in s:
-              a = "import urllib.request\n"
-              s = s.replace(a, a + "import webbrowser\n", 1) if a in s else "import webbrowser\n" + s
+              a = "from __future__ import annotations\n"
+              if a in s:
+                  s = s.replace(a, a + "import webbrowser\n", 1)
+              else:
+                  a = "import urllib.request\n"
+                  s = s.replace(a, a + "import webbrowser\n", 1) if a in s else s
 
           if "TEAM_URL =" not in s and "TELEGRAM_BOT_URL =" not in s:
               a = "UPDATE_MANIFEST_URL = "
