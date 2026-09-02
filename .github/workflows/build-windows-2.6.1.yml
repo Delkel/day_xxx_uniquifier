@@ -1,7 +1,9 @@
 name: Build Windows 2.6.1
 on:
   push:
-    paths: ['WIN_261_TRIGGER.txt']
+    paths:
+      - 'WIN_261_TRIGGER.txt'
+      - '.github/workflows/build-windows-2.6.1.yml'
   workflow_dispatch:
 permissions:
   contents: write
@@ -37,8 +39,8 @@ jobs:
           if ($png) { Copy-Item $png.FullName win/EnkiAgencyUniq.png }
           python tools/patch_windows_261.py
           python -m py_compile win/app.py win/uniquify_engine.py
-          Select-String win/app.py 'APP_VERSION = "2.6.1"' | Out-Null
-          Select-String win/app.py 'platforms' | Out-Null
+          if (!(Select-String -Path win/app.py -Pattern 'APP_VERSION = "2.6.1"' -Quiet)) { throw 'Version patch missing' }
+          if (!(Select-String -Path win/app.py -Pattern 'platforms' -Quiet)) { throw 'Windows updater patch missing' }
       - name: Build app
         shell: powershell
         run: |
@@ -57,6 +59,7 @@ jobs:
           $dist='dist/Enki Agency Uniq'
           $ffmpeg=Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffmpeg.exe | Select-Object -First 1
           $ffprobe=Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffprobe.exe | Select-Object -First 1
+          if (!$ffmpeg -or !$ffprobe) { throw 'FFmpeg missing' }
           Copy-Item $ffmpeg.FullName "$dist/ffmpeg.exe" -Force; Copy-Item $ffprobe.FullName "$dist/ffprobe.exe" -Force
           $p=Start-Process "$dist/Enki Agency Uniq.exe" -PassThru; Start-Sleep 6
           if ($p.HasExited) { throw "App exited early $($p.ExitCode)" }; Stop-Process $p -Force
@@ -100,6 +103,7 @@ jobs:
           $r=Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($r.ExitCode -ne 0) { throw "Install failed $($r.ExitCode)" }
           $installed="$env:LOCALAPPDATA\Programs\Enki Agency Uniq\Enki Agency Uniq.exe"
+          if (!(Test-Path $installed)) { throw 'Installed app missing' }
           $p=Start-Process $installed -PassThru; Start-Sleep 6
           if ($p.HasExited) { throw 'Installed app exited early' }; Stop-Process $p -Force
           Get-FileHash $setup -Algorithm SHA256
@@ -123,7 +127,8 @@ jobs:
           }
           '@ | Set-Content update-manifest.json -Encoding UTF8
           git config user.name github-actions-bot; git config user.email actions@github.com
-          git add update-manifest.json; git commit -m 'Publish Windows 2.6.1 updater manifest'; git push
+          git add update-manifest.json
+          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'Publish Windows 2.6.1 updater manifest'; git push }
       - uses: actions/upload-artifact@v4
         with:
           name: Enki_Agency_Uniq_2.6.1_Setup
