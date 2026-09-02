@@ -91,7 +91,7 @@ jobs:
           RestartApplications=yes
           DisableProgramGroupPage=yes
           [Files]
-          Source: "dist\Enki Agency Uniq\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "dist\Enki Agency Uniq\*.*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
           [Icons]
           Name: "{autoprograms}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"
           Name: "{autodesktop}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"; Tasks: desktopicon
