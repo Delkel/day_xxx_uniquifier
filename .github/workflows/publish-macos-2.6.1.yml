@@ -1,0 +1,52 @@
+name: Publish macOS 2.6.1
+
+on:
+  push:
+    paths:
+      - 'MAC_261_TRIGGER.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare and validate package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf mac261
+          mkdir mac261
+          ditto -x -k release/enki_agency_uniq_2.6.0_macos.zip mac261
+          python3 tools/patch_mac_261.py
+          APP_PY=$(find mac261 -name app.py -type f | head -1)
+          test -n "$APP_PY"
+          python3 -m py_compile "$APP_PY"
+          grep -q 'APP_VERSION = "2.6.1"' "$APP_PY"
+          grep -q 'b.setFixedHeight(38)' "$APP_PY"
+          grep -q 'self.compact_update_btn.clicked.connect(self.check_updates)' "$APP_PY"
+          grep -q 'self.update_btn = self.compact_update_btn' "$APP_PY"
+          grep -q 'min-height:38px' "$APP_PY"
+          grep -q 'max-height:38px' "$APP_PY"
+          find mac261 -type f \( -name '*.command' -o -name 'bootstrap.sh' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
+          rm -f release/enki_agency_uniq_2.6.1_macos.zip
+          (cd mac261 && ditto -c -k --sequesterRsrc . ../release/enki_agency_uniq_2.6.1_macos.zip)
+          test -s release/enki_agency_uniq_2.6.1_macos.zip
+      - name: Publish
+        shell: bash
+        run: |
+          cat > update-manifest.json <<'JSON'
+          {
+            "version": "2.6.1",
+            "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.6.1_macos.zip",
+            "notes": "Enki Agency Uniq 2.6.1: боковые кнопки стали компактнее и оформлены отдельными тёмными карточками с тонкой рамкой, уменьшены вертикальные интервалы и устранено наложение на логотип. Рабочая логика кнопки обновления сохранена без изменений."
+          }
+          JSON
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add release/enki_agency_uniq_2.6.1_macos.zip update-manifest.json
+          git commit -m 'Publish Enki Agency Uniq 2.6.1 macOS'
+          git push
