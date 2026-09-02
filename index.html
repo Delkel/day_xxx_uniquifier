@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#101113" />
+    <title>ENKI Uniq</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script type="module" crossorigin src="./assets/index-8o2tgfGH.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BE56cRdv.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="brand">
+        <img src="./assets/enki-join-banner.jpg" alt="" class="brand__image" />
+        <div class="brand__shade"></div>
+        <div class="brand__content">
+          <img src="./assets/enki-logo.jpg" alt="ENKI Agency" class="brand__logo" />
+          <p class="eyebrow">ENKI Agency</p>
+          <h1>Uniq Studio</h1>
+        </div>
+      </section>
+
+      <section class="panel">
+        <label class="file-drop" for="videoInput">
+          <input id="videoInput" type="file" accept="video/*" />
+          <span class="file-drop__icon">+</span>
+          <span class="file-drop__title" id="fileTitle">Выбрать видео</span>
+          <span class="file-drop__meta" id="fileMeta">MP4, MOV, M4V, WebM</span>
+        </label>
+
+        <div class="control">
+          <div class="control__top">
+            <span>Сила</span>
+            <strong id="strengthLabel">instagram</strong>
+          </div>
+          <div class="segments" id="strengthGroup">
+            <button type="button" data-strength="light">light</button>
+            <button type="button" data-strength="normal">normal</button>
+            <button type="button" data-strength="strong">strong</button>
+            <button type="button" data-strength="instagram" class="is-active">instagram</button>
+          </div>
+        </div>
+
+        <div class="control">
+          <div class="control__top">
+            <span>Варианты</span>
+            <strong id="countLabel">1</strong>
+          </div>
+          <div class="stepper">
+            <button type="button" id="minusCount">-</button>
+            <div id="countValue">1</div>
+            <button type="button" id="plusCount">+</button>
+          </div>
+        </div>
+
+        <label class="switch-row">
+          <span>
+            <strong>CapCut-метаданные</strong>
+            <small>случайные теги контейнера</small>
+          </span>
+          <input id="capcutToggle" type="checkbox" checked />
+        </label>
+
+        <button type="button" class="primary" id="runButton" disabled>Уникализировать</button>
+      </section>
+
+      <section class="progress panel is-hidden" id="progressPanel">
+        <div class="progress__top">
+          <span id="statusText">Подготовка</span>
+          <strong id="percentText">0%</strong>
+        </div>
+        <div class="bar"><div id="barFill"></div></div>
+      </section>
+
+      <section class="results" id="results"></section>
+    </main>
+
+  </body>
+</html>
