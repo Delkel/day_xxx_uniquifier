@@ -1,5 +1,5 @@
 {
-  "version": "2.6.0",
-  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.6.0_macos.zip",
-  "notes": "Enki Agency Uniq 2.6.0: исправлены отступы логотипа и бокового меню, все кнопки приведены к единому размеру, нижний статус и блок версии получили единый фон. Исправленная кнопка обновления 2.5.7 сохранена."
+  "version": "2.6.1",
+  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.6.1_macos.zip",
+  "notes": "Enki Agency Uniq 2.6.1: боковые кнопки стали компактнее и оформлены отдельными тёмными карточками с тонкой рамкой, уменьшены вертикальные интервалы и устранено наложение на логотип. Рабочая логика кнопки обновления сохранена без изменений."
 }
