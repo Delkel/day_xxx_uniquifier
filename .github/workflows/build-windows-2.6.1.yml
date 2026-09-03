@@ -69,9 +69,15 @@ jobs:
         shell: powershell
         run: |
           Set-Location win
+          $sourceDir=(Resolve-Path -LiteralPath 'dist\Enki Agency Uniq').Path
+          Write-Host "Installer source: $sourceDir"
+          Get-ChildItem -LiteralPath $sourceDir -Recurse | Select-Object -First 20 -ExpandProperty FullName
           @'
           #define MyAppName "Enki Agency Uniq"
           #define MyAppVersion "2.6.1"
+          #ifndef SourceDir
+            #error SourceDir was not supplied
+          #endif
           [Setup]
           AppId={{A8F7E919-927B-4C51-8CDA-250100000001}}
           AppName={#MyAppName}
@@ -91,7 +97,7 @@ jobs:
           RestartApplications=yes
           DisableProgramGroupPage=yes
           [Files]
-          Source: "dist\Enki Agency Uniq\*.*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
           [Icons]
           Name: "{autoprograms}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"
           Name: "{autodesktop}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"; Tasks: desktopicon
@@ -100,7 +106,8 @@ jobs:
           [Run]
           Filename: "{app}\Enki Agency Uniq.exe"; Description: "Launch Enki Agency Uniq"; Flags: nowait postinstall skipifsilent
           '@ | Set-Content installer.iss -Encoding UTF8
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DSourceDir=$sourceDir" installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed $LASTEXITCODE" }
           $setup='installer/Enki_Agency_Uniq_2.6.1_Setup.exe'; if (!(Test-Path $setup)) { throw 'Installer missing' }
           $r=Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($r.ExitCode -ne 0) { throw "Install failed $($r.ExitCode)" }
