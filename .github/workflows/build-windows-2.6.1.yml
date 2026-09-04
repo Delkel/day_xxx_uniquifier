@@ -121,32 +121,41 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $ErrorActionPreference='Stop'
           $setup='win/installer/Enki_Agency_Uniq_2.6.1_Setup.exe'
           if (!(Test-Path $setup)) { throw 'Setup missing before publish' }
-          gh release view v2.6.1 *> $null
+
+          gh release view v2.6.1 --repo $env:GITHUB_REPOSITORY 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create v2.6.1 --title 'Enki Agency Uniq 2.6.1' --notes 'Enki Agency Uniq 2.6.1 for macOS and Windows'
+            gh release create v2.6.1 --repo $env:GITHUB_REPOSITORY --title 'Enki Agency Uniq 2.6.1' --notes 'Enki Agency Uniq 2.6.1 for macOS and Windows'
             if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
           }
-          gh release upload v2.6.1 $setup --clobber
+
+          gh release upload v2.6.1 $setup --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed' }
+
           $manifestPath='update-manifest.json'
           $manifest=Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $manifest.version='2.6.1'
-          if (-not $manifest.platforms) { $manifest | Add-Member -NotePropertyName platforms -NotePropertyValue ([pscustomobject]@{}) }
-          if (-not $manifest.platforms.windows) { $manifest.platforms | Add-Member -NotePropertyName windows -NotePropertyValue ([pscustomobject]@{}) }
-          $manifest.platforms.windows | Add-Member -Force -NotePropertyName url -NotePropertyValue 'https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.6.1/Enki_Agency_Uniq_2.6.1_Setup.exe'
-          $manifest.platforms.windows | Add-Member -Force -NotePropertyName type -NotePropertyValue 'setup'
-          $manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
+          $macUrl=$manifest.zip_url
+          $notes=$manifest.notes
+          $newManifest=[ordered]@{
+            version='2.6.1'
+            zip_url=$macUrl
+            notes=$notes
+            platforms=[ordered]@{
+              macos=[ordered]@{ url=$macUrl; type='zip' }
+              windows=[ordered]@{ url='https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.6.1/Enki_Agency_Uniq_2.6.1_Setup.exe'; type='setup' }
+            }
+          }
+          $newManifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -Encoding utf8
+
           git config user.name github-actions-bot
           git config user.email actions@github.com
           git add $manifestPath
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             git commit -m 'Publish Windows 2.6.1 updater manifest'
-            git pull --rebase origin main
             git push origin HEAD:main
+            if ($LASTEXITCODE -ne 0) { throw 'Manifest push failed' }
           }
       - uses: actions/upload-artifact@v4
         with:
