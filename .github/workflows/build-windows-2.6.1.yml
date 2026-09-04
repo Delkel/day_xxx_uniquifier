@@ -123,16 +123,15 @@ jobs:
         run: |
           $setup='win/installer/Enki_Agency_Uniq_2.6.1_Setup.exe'
           if (!(Test-Path $setup)) { throw 'Setup missing before publish' }
-
-          gh release view v2.6.1 --repo $env:GITHUB_REPOSITORY 2>$null
-          if ($LASTEXITCODE -ne 0) {
+          $releaseExists=$true
+          gh release view v2.6.1 --repo $env:GITHUB_REPOSITORY --json tagName 2>$null | Out-Null
+          if ($LASTEXITCODE -ne 0) { $releaseExists=$false }
+          if (-not $releaseExists) {
             gh release create v2.6.1 --repo $env:GITHUB_REPOSITORY --title 'Enki Agency Uniq 2.6.1' --notes 'Enki Agency Uniq 2.6.1 for macOS and Windows'
             if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
           }
-
           gh release upload v2.6.1 $setup --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed' }
-
           $manifestPath='update-manifest.json'
           $manifest=Get-Content $manifestPath -Raw | ConvertFrom-Json
           $macUrl=$manifest.zip_url
@@ -147,13 +146,14 @@ jobs:
             }
           }
           $newManifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -Encoding utf8
-
           git config user.name github-actions-bot
           git config user.email actions@github.com
           git add $manifestPath
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             git commit -m 'Publish Windows 2.6.1 updater manifest'
+            git pull --rebase origin main
+            if ($LASTEXITCODE -ne 0) { throw 'Manifest rebase failed' }
             git push origin HEAD:main
             if ($LASTEXITCODE -ne 0) { throw 'Manifest push failed' }
           }
