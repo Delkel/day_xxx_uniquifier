@@ -1,5 +1,15 @@
-{
-  "version": "2.6.1",
-  "zip_url": "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.6.1_macos.zip",
-  "notes": "Enki Agency Uniq 2.6.1: боковые кнопки стали компактнее и оформлены отдельными тёмными карточками с тонкой рамкой, уменьшены вертикальные интервалы и устранено наложение на логотип. Рабочая логика кнопки обновления сохранена без изменений."
+﻿{
+    "version":  "2.6.1",
+    "zip_url":  "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.6.1_macos.zip",
+    "notes":  "Enki Agency Uniq 2.6.1: Ð±Ð¾ÐºÐ¾Ð²Ñ‹Ðµ ÐºÐ½Ð¾Ð¿ÐºÐ¸ ÑÑ‚Ð°Ð»Ð¸ ÐºÐ¾Ð¼Ð¿Ð°ÐºÑ‚Ð½ÐµÐµ Ð¸ Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÐµÐ½Ñ‹ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¼Ð¸ Ñ‚Ñ‘Ð¼Ð½Ñ‹Ð¼Ð¸ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ°Ð¼Ð¸ Ñ Ñ‚Ð¾Ð½ÐºÐ¾Ð¹ Ñ€Ð°Ð¼ÐºÐ¾Ð¹, ÑƒÐ¼ÐµÐ½ÑŒÑˆÐµÐ½Ñ‹ Ð²ÐµÑ€Ñ‚Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹Ðµ Ð¸Ð½Ñ‚ÐµÑ€Ð²Ð°Ð»Ñ‹ Ð¸ ÑƒÑÑ‚Ñ€Ð°Ð½ÐµÐ½Ð¾ Ð½Ð°Ð»Ð¾Ð¶ÐµÐ½Ð¸Ðµ Ð½Ð° Ð»Ð¾Ð³Ð¾Ñ‚Ð¸Ð¿. Ð Ð°Ð±Ð¾Ñ‡Ð°Ñ Ð»Ð¾Ð³Ð¸ÐºÐ° ÐºÐ½Ð¾Ð¿ÐºÐ¸ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð° Ð±ÐµÐ· Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹.",
+    "platforms":  {
+                      "macos":  {
+                                    "url":  "https://raw.githubusercontent.com/Delkel/day_xxx_uniquifier/main/release/enki_agency_uniq_2.6.1_macos.zip",
+                                    "type":  "zip"
+                                },
+                      "windows":  {
+                                      "url":  "https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.6.1/Enki_Agency_Uniq_2.6.1_Setup.exe",
+                                      "type":  "setup"
+                                  }
+                  }
 }
