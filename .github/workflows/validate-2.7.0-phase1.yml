@@ -1,0 +1,43 @@
+name: Validate Enki 2.7.0 Phase 1
+on:
+  push:
+    paths:
+      - 'ENKI_270_PHASE1_TRIGGER.txt'
+      - 'tools/patch_270_phase1.py'
+      - '.github/workflows/validate-2.7.0-phase1.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare 2.7.0 source
+        shell: bash
+        run: |
+          set -e
+          mkdir -p work270
+          cp source_261/app.py source_261/uniquify_engine.py work270/
+          python tools/patch_270_phase1.py
+          python -m py_compile work270/app.py work270/uniquify_engine.py
+          grep -q 'APP_VERSION = "2.7.0"' work270/app.py
+          grep -q 'ThreadPoolExecutor' work270/app.py
+          grep -q 'preferred_video_encoder' work270/uniquify_engine.py
+      - name: Engine unit smoke test
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0,'work270')
+          import uniquify_engine as e
+          assert e.preferred_video_encoder('cpu') == 'libx264'
+          assert e.preferred_video_encoder('auto') in {'libx264','h264_nvenc'}
+          print('phase1 engine smoke test OK')
+          PY
