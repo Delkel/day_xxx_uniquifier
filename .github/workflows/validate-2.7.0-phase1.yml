@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
       - name: Prepare 2.7.0 source
         shell: bash
         run: |
@@ -33,6 +35,7 @@ jobs:
       - name: Engine unit smoke test
         shell: bash
         run: |
+          ffmpeg -version
           python - <<'PY'
           import sys
           sys.path.insert(0,'work270')
