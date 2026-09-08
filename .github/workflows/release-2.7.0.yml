@@ -8,7 +8,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
-
 jobs:
   windows:
     runs-on: windows-latest
@@ -29,13 +28,16 @@ jobs:
           New-Item -ItemType Directory -Force work270 | Out-Null
           Copy-Item source_261/app.py work270/app.py
           Copy-Item source_261/uniquify_engine.py work270/uniquify_engine.py
-          Copy-Item source_261/captions.json work270/captions.json
-          Copy-Item source_261/EnkiAgencyUniq.png work270/EnkiAgencyUniq.png
+          if (Test-Path source_261/captions.json) { Copy-Item source_261/captions.json work270/captions.json } else { '{}' | Set-Content work270/captions.json -Encoding UTF8 }
           python tools/prepare_270.py
-          python tools/patch_windows_261.py
-          (Get-Content win/app.py -Raw).Replace('2.6.1','2.7.0') | Set-Content win/app.py -Encoding UTF8
-          Copy-Item work270/uniquify_engine.py win/uniquify_engine.py -Force
+          New-Item -ItemType Directory -Force win | Out-Null
+          Copy-Item work270/app.py win/app.py
+          Copy-Item work270/uniquify_engine.py win/uniquify_engine.py
+          Copy-Item work270/captions.json win/captions.json
+          $png=Get-ChildItem release -Recurse -File -Filter EnkiAgencyUniq.png -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($png) { Copy-Item $png.FullName win/EnkiAgencyUniq.png }
           python -m py_compile win/app.py win/uniquify_engine.py
+          if (!(Select-String win/app.py -Pattern 'APP_VERSION = "2.7.0"' -Quiet)) { throw 'Version missing' }
       - name: Build app and installer
         shell: powershell
         run: |
@@ -54,6 +56,7 @@ jobs:
           $dist='dist/Enki Agency Uniq'
           $ffmpeg=Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffmpeg.exe | Select-Object -First 1
           $ffprobe=Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffprobe.exe | Select-Object -First 1
+          if (!$ffmpeg -or !$ffprobe) { throw 'FFmpeg missing' }
           Copy-Item $ffmpeg.FullName "$dist/ffmpeg.exe" -Force; Copy-Item $ffprobe.FullName "$dist/ffprobe.exe" -Force
           $p=Start-Process "$dist/Enki Agency Uniq.exe" -PassThru; Start-Sleep 6
           if ($p.HasExited) { throw 'Built app exited early' }; Stop-Process $p -Force
@@ -98,13 +101,12 @@ jobs:
           $r=Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($r.ExitCode -ne 0) { throw 'Silent install failed' }
           $installed="$env:LOCALAPPDATA\Programs\Enki Agency Uniq\Enki Agency Uniq.exe"
+          if (!(Test-Path $installed)) { throw 'Installed app missing' }
           $p=Start-Process $installed -PassThru; Start-Sleep 6
           if ($p.HasExited) { throw 'Installed app exited early' }; Stop-Process $p -Force
+          Get-FileHash $setup -Algorithm SHA256
       - uses: actions/upload-artifact@v4
-        with:
-          name: Enki_Agency_Uniq_2.7.0_Setup
-          path: win/installer/Enki_Agency_Uniq_2.7.0_Setup.exe
-
+        with: {name: Enki_Agency_Uniq_2.7.0_Setup, path: 'win/installer/Enki_Agency_Uniq_2.7.0_Setup.exe'}
   macos:
     runs-on: macos-latest
     timeout-minutes: 30
@@ -114,25 +116,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf mac270 work270
-          mkdir work270 mac270
+          rm -rf mac270 work270; mkdir work270 mac270
           cp source_261/app.py source_261/uniquify_engine.py work270/
           python3 tools/prepare_270.py
           ditto -x -k release/enki_agency_uniq_2.6.1_macos.zip mac270
-          APP=$(find mac270 -name app.py -type f | head -1)
-          ENG=$(find mac270 -name uniquify_engine.py -type f | head -1)
+          APP=$(find mac270 -name app.py -type f | head -1); ENG=$(find mac270 -name uniquify_engine.py -type f | head -1)
           cp work270/app.py "$APP"; cp work270/uniquify_engine.py "$ENG"
           python3 -m py_compile "$APP" "$ENG"
-          grep -q 'APP_VERSION = "2.7.0"' "$APP"
-          grep -q 'ThreadPoolExecutor' "$APP"
+          grep -q 'APP_VERSION = "2.7.0"' "$APP"; grep -q 'ThreadPoolExecutor' "$APP"
           find mac270 -type f \( -name '*.command' -o -name 'bootstrap.sh' -o -path '*/Contents/MacOS/*' \) -exec chmod +x {} \; || true
           (cd mac270 && ditto -c -k --sequesterRsrc . ../enki_agency_uniq_2.7.0_macos.zip)
           test -s enki_agency_uniq_2.7.0_macos.zip
       - uses: actions/upload-artifact@v4
-        with:
-          name: enki_agency_uniq_2.7.0_macos
-          path: enki_agency_uniq_2.7.0_macos.zip
-
+        with: {name: enki_agency_uniq_2.7.0_macos, path: enki_agency_uniq_2.7.0_macos.zip}
   publish:
     needs: [windows, macos]
     runs-on: ubuntu-latest
@@ -148,7 +144,7 @@ jobs:
         with:
           tag_name: v2.7.0
           name: Enki Agency Uniq 2.7.0
-          body: "Enki Agency Uniq 2.7.0: faster batch processing, hardware capability detection, Windows and macOS release."
+          body: 'Enki Agency Uniq 2.7.0: faster batch processing and hardware capability detection.'
           files: |
             release270/Enki_Agency_Uniq_2.7.0_Setup.exe
             release270/enki_agency_uniq_2.7.0_macos.zip
@@ -156,21 +152,14 @@ jobs:
       - name: Publish updater manifest
         shell: bash
         run: |
-          set -e
           cat > update-manifest.json <<'JSON'
           {
-            "version": "2.7.0",
-            "zip_url": "https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/enki_agency_uniq_2.7.0_macos.zip",
-            "notes": "Enki Agency Uniq 2.7.0: ускорена пакетная обработка файлов и подготовлена аппаратная поддержка кодирования с безопасным CPU fallback.",
-            "platforms": {
-              "macos": {"url": "https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/enki_agency_uniq_2.7.0_macos.zip", "type": "zip"},
-              "windows": {"url": "https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/Enki_Agency_Uniq_2.7.0_Setup.exe", "type": "setup"}
-            }
+            "version":"2.7.0",
+            "zip_url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/enki_agency_uniq_2.7.0_macos.zip",
+            "notes":"Enki Agency Uniq 2.7.0: ускорена пакетная обработка файлов и добавлено определение аппаратного кодирования с CPU fallback.",
+            "platforms":{"macos":{"url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/enki_agency_uniq_2.7.0_macos.zip","type":"zip"},"windows":{"url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/Enki_Agency_Uniq_2.7.0_Setup.exe","type":"setup"}}
           }
           JSON
-          git config user.name github-actions-bot
-          git config user.email actions@github.com
-          git add update-manifest.json
-          git commit -m 'Publish Enki Agency Uniq 2.7.0 updater' || true
-          git pull --rebase origin main
-          git push origin HEAD:main
+          git config user.name github-actions-bot; git config user.email actions@github.com
+          git add update-manifest.json; git commit -m 'Publish Enki Agency Uniq 2.7.0 updater' || true
+          git pull --rebase origin main; git push origin HEAD:main
