@@ -32,9 +32,7 @@ jobs:
           python tools/patch_windows_261.py
           (Get-Content win/app.py -Raw).Replace('APP_VERSION = "2.6.1"','APP_VERSION = "2.8.1"') | Set-Content win/app.py -Encoding UTF8
           python -m py_compile win/app.py win/uniquify_engine.py
-          if (!(Select-String win/app.py -Pattern 'Убрать ошибки из очереди' -Quiet)) { throw 'Failed-queue cleanup missing' }
-          if (!(Select-String win/uniquify_engine.py -Pattern 'CREATE_NO_WINDOW' -Quiet)) { throw 'Hidden subprocess fix missing' }
-          if (!(Select-String win/uniquify_engine.py -Pattern 'stderr=subprocess.STDOUT' -Quiet)) { throw 'Deadlock fix missing' }
+          python -c "from pathlib import Path; a=Path('win/app.py').read_text(encoding='utf-8-sig'); e=Path('win/uniquify_engine.py').read_text(encoding='utf-8-sig'); assert 'Убрать ошибки из очереди' in a; assert 'CREATE_NO_WINDOW' in e; assert 'stderr=subprocess.STDOUT' in e; print('2.8.1 reliability patches OK')"
       - name: Engine smoke test
         shell: powershell
         timeout-minutes: 8
