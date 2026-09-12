@@ -1,6 +1,6 @@
 {
-  "version":"2.7.0",
-  "zip_url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/enki_agency_uniq_2.7.0_macos.zip",
-  "notes":"Enki Agency Uniq 2.7.0: ускорена пакетная обработка файлов и добавлено определение аппаратного кодирования с CPU fallback.",
-  "platforms":{"macos":{"url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/enki_agency_uniq_2.7.0_macos.zip","type":"zip"},"windows":{"url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.7.0/Enki_Agency_Uniq_2.7.0_Setup.exe","type":"setup"}}
+  "version":"2.8.1",
+  "zip_url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.8.1/enki_agency_uniq_2.8.1_macos.zip",
+  "notes":"2.8.1: исправлены ошибки Windows: скрыты всплывающие CMD-окна FFmpeg/FFprobe, устранена блокировка процесса вывода, битые незавершенные файлы очищаются, ошибочные задачи можно убрать из очереди без удаления исходников. Сохранены режимы Auto/NVIDIA/Apple/CPU и CPU fallback.",
+  "platforms":{"macos":{"url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.8.1/enki_agency_uniq_2.8.1_macos.zip","type":"zip"},"windows":{"url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.8.1/Enki_Agency_Uniq_2.8.1_Setup.exe","type":"setup"}}
 }
