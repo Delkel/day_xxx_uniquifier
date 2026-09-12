@@ -1,0 +1,147 @@
+name: Release Enki Agency Uniq 2.8.2
+on:
+  push:
+    paths: ['.github/workflows/release-2.8.2.yml','tools/patch_282_encoding.py']
+  workflow_dispatch:
+permissions: {contents: write}
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12', architecture: x64}
+      - name: Install tools
+        shell: powershell
+        run: |
+          choco install ffmpeg innosetup -y --no-progress
+          python -m pip install PySide6 Pillow pyinstaller
+      - name: Prepare and validate UTF-8 build
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force work280,work281,win | Out-Null
+          Copy-Item source_261/app.py work280/app.py
+          Copy-Item source_261/uniquify_engine.py work280/uniquify_engine.py
+          Copy-Item source_261/captions.json work280/captions.json
+          python tools/prepare_280.py
+          Copy-Item work280/* work281/ -Force
+          python tools/patch_281_windows_reliability.py
+          Copy-Item work281/app.py win/app.py; Copy-Item work281/uniquify_engine.py win/uniquify_engine.py; Copy-Item work281/captions.json win/captions.json
+          python tools/patch_windows_261.py
+          python tools/patch_282_encoding.py
+          python -m py_compile win/app.py win/uniquify_engine.py
+          python -c "from pathlib import Path; a=Path('win/app.py').read_text(encoding='utf-8'); assert 'APP_VERSION = \"2.8.2\"' in a; assert 'Добавить видео' in a; assert 'Настройки' in a; assert 'Обработка' in a; print('Cyrillic UTF-8 OK')"
+      - name: Engine smoke test
+        shell: powershell
+        timeout-minutes: 8
+        run: |
+          ffmpeg -y -f lavfi -i testsrc2=size=320x240:rate=30 -f lavfi -i sine=frequency=800 -t 1 -c:v libx264 -c:a aac smoke.mp4
+          python -c "from pathlib import Path; import sys; sys.path.insert(0,'win'); import uniquify_engine as e; e.uniquify(Path('smoke.mp4'),Path('smokeout'),1,123,'light',False,None,False,True,None,'cpu')"
+          if (!(Get-ChildItem smokeout -File | Select-Object -First 1)) { throw 'Engine output missing' }
+      - name: Build install and launch
+        shell: powershell
+        run: |
+          Set-Location win
+          @'
+          # -*- mode: python ; coding: utf-8 -*-
+          import os
+          from PyInstaller.utils.hooks import collect_submodules
+          datas=[('captions.json','.')]
+          if os.path.exists('EnkiAgencyUniq.png'): datas.append(('EnkiAgencyUniq.png','.'))
+          a=Analysis(['app.py'],datas=datas,hiddenimports=collect_submodules('PySide6')+['uniquify_engine']); pyz=PYZ(a.pure); exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Enki Agency Uniq',console=False); coll=COLLECT(exe,a.binaries,a.datas,name='Enki Agency Uniq')
+          '@ | Set-Content EnkiAgencyUniq.spec -Encoding UTF8
+          pyinstaller --noconfirm --clean EnkiAgencyUniq.spec
+          $dist='dist/Enki Agency Uniq'
+          $ffmpeg=Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffmpeg.exe | Select-Object -First 1
+          $ffprobe=Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -File -Filter ffprobe.exe | Select-Object -First 1
+          Copy-Item $ffmpeg.FullName "$dist/ffmpeg.exe" -Force; Copy-Item $ffprobe.FullName "$dist/ffprobe.exe" -Force
+          $p=Start-Process "$dist/Enki Agency Uniq.exe" -PassThru; Start-Sleep 5; if ($p.HasExited) { throw 'Built app exited early' }; Stop-Process $p -Force
+          $sourceDir=(Resolve-Path -LiteralPath $dist).Path
+          @'
+          #define MyAppName "Enki Agency Uniq"
+          #define MyAppVersion "2.8.2"
+          #ifndef SourceDir
+            #error SourceDir missing
+          #endif
+          [Setup]
+          AppId={{A8F7E919-927B-4C51-8CDA-250100000001}}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppPublisher=Enki Agency
+          DefaultDirName={localappdata}\Programs\Enki Agency Uniq
+          OutputDir=installer
+          OutputBaseFilename=Enki_Agency_Uniq_2.8.2_Setup
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          PrivilegesRequired=lowest
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          WizardStyle=modern
+          CloseApplications=yes
+          [Files]
+          Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          [Icons]
+          Name: "{autoprograms}\Enki Agency Uniq"; Filename: "{app}\Enki Agency Uniq.exe"
+          [Run]
+          Filename: "{app}\Enki Agency Uniq.exe"; Description: "Launch Enki Agency Uniq"; Flags: nowait postinstall skipifsilent
+          '@ | Set-Content installer.iss -Encoding UTF8
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DSourceDir=$sourceDir" installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed' }
+          $setup='installer/Enki_Agency_Uniq_2.8.2_Setup.exe'
+          $r=Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru; if ($r.ExitCode -ne 0) { throw 'Silent install failed' }
+          $installed="$env:LOCALAPPDATA\Programs\Enki Agency Uniq\Enki Agency Uniq.exe"; if (!(Test-Path $installed)) { throw 'Installed app missing' }
+          $p=Start-Process $installed -PassThru; Start-Sleep 5; if ($p.HasExited) { throw 'Installed app exited early' }; Stop-Process $p -Force
+      - uses: actions/upload-artifact@v4
+        with: {name: Enki_Agency_Uniq_2.8.2_Setup, path: 'win/installer/Enki_Agency_Uniq_2.8.2_Setup.exe'}
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf work280 work281 mac282; mkdir work280 work281 mac282
+          cp source_261/app.py source_261/uniquify_engine.py source_261/captions.json work280/
+          python3 tools/prepare_280.py
+          cp work280/* work281/
+          python3 tools/patch_281_windows_reliability.py
+          sed -i '' 's/APP_VERSION = "2.8.1"/APP_VERSION = "2.8.2"/' work281/app.py
+          python3 -m py_compile work281/app.py work281/uniquify_engine.py
+          ditto -x -k release/enki_agency_uniq_2.6.1_macos.zip mac282
+          APP=$(find mac282 -name app.py -type f | head -1); ENG=$(find mac282 -name uniquify_engine.py -type f | head -1)
+          cp work281/app.py "$APP"; cp work281/uniquify_engine.py "$ENG"
+          (cd mac282 && ditto -c -k --sequesterRsrc . ../enki_agency_uniq_2.8.2_macos.zip)
+      - uses: actions/upload-artifact@v4
+        with: {name: enki_agency_uniq_2.8.2_macos, path: enki_agency_uniq_2.8.2_macos.zip}
+  publish:
+    needs: [windows,macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/download-artifact@v4
+        with: {name: Enki_Agency_Uniq_2.8.2_Setup, path: release282}
+      - uses: actions/download-artifact@v4
+        with: {name: enki_agency_uniq_2.8.2_macos, path: release282}
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.8.2
+          name: Enki Agency Uniq 2.8.2
+          body: 'UTF-8 Windows UI hotfix plus the 2.8.1 Windows reliability fixes.'
+          files: |
+            release282/Enki_Agency_Uniq_2.8.2_Setup.exe
+            release282/enki_agency_uniq_2.8.2_macos.zip
+          fail_on_unmatched_files: true
+      - name: Switch updater
+        shell: bash
+        run: |
+          cat > update-manifest.json <<'JSON'
+          {"version":"2.8.2","zip_url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.8.2/enki_agency_uniq_2.8.2_macos.zip","notes":"2.8.2: исправлена кодировка русского интерфейса Windows; сохранены исправления CMD/FFmpeg и очереди из 2.8.1.","platforms":{"macos":{"url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.8.2/enki_agency_uniq_2.8.2_macos.zip","type":"zip"},"windows":{"url":"https://github.com/Delkel/day_xxx_uniquifier/releases/download/v2.8.2/Enki_Agency_Uniq_2.8.2_Setup.exe","type":"setup"}}}
+          JSON
+          git config user.name github-actions-bot; git config user.email actions@github.com
+          git add update-manifest.json; git commit -m 'Publish Enki Agency Uniq 2.8.2 updater' || true
+          git pull --rebase origin main; git push origin HEAD:main
