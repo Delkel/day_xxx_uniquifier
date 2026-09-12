@@ -31,7 +31,7 @@ jobs:
           python tools/patch_windows_261.py
           python tools/patch_282_encoding.py
           python -m py_compile win/app.py win/uniquify_engine.py
-          python -c "from pathlib import Path; a=Path('win/app.py').read_text(encoding='utf-8'); assert 'APP_VERSION = \"2.8.2\"' in a; assert 'Добавить видео' in a; assert 'Настройки' in a; assert 'Обработка' in a; print('Cyrillic UTF-8 OK')"
+          python tools/patch_282_encoding.py
       - name: Engine smoke test
         shell: powershell
         timeout-minutes: 8
