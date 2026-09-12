@@ -27,11 +27,12 @@ jobs:
           python tools/prepare_280.py
           Copy-Item work280/* work281/ -Force
           python tools/patch_281_windows_reliability.py
-          Copy-Item work281/app.py win/app.py; Copy-Item work281/uniquify_engine.py win/uniquify_engine.py; Copy-Item work281/captions.json win/captions.json
+          Copy-Item work281/app.py win/app.py
+          Copy-Item work281/uniquify_engine.py win/uniquify_engine.py
+          Copy-Item work281/captions.json win/captions.json
           python tools/patch_windows_261.py
           python tools/patch_282_encoding.py
           python -m py_compile win/app.py win/uniquify_engine.py
-          python tools/patch_282_encoding.py
       - name: Engine smoke test
         shell: powershell
         timeout-minutes: 8
