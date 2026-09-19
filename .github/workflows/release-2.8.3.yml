@@ -114,12 +114,14 @@ jobs:
           python3 tools/patch_281_windows_reliability.py
           python3 - <<'PY'
           from pathlib import Path
-          import re
-          p = Path("work281/app.py")
-          s = p.read_text(encoding="utf-8")
-          s = re.sub(r'APP_VERSION\\s*=\\s*["\\\'][^"\\\']+["\\\']', 'APP_VERSION = "2.8.3"', s, count=1)
-          p.write_text(s, encoding="utf-8", newline="\\n")
-          assert 'APP_VERSION = "2.8.3"' in p.read_text(encoding="utf-8")
+          p = Path('work281/app.py')
+          s = p.read_text(encoding='utf-8')
+          old = 'APP_VERSION = "2.8.1"'
+          new = 'APP_VERSION = "2.8.3"'
+          if old not in s:
+              raise SystemExit('Expected macOS APP_VERSION 2.8.1 not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8', newline='\n')
+          assert new in p.read_text(encoding='utf-8')
           PY
           python3 -m py_compile work281/app.py work281/uniquify_engine.py
           ditto -x -k release/enki_agency_uniq_2.6.1_macos.zip mac283
