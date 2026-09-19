@@ -30,9 +30,12 @@ jobs:
           Copy-Item work281/app.py win/app.py
           Copy-Item work281/uniquify_engine.py win/uniquify_engine.py
           Copy-Item work281/captions.json win/captions.json
+          Copy-Item 'app/DuckyBruto Uniq.app/Contents/Resources/DuckyBrutoUniq.png' win/EnkiAgencyUniq.png -Force
+          if (!(Test-Path win/EnkiAgencyUniq.png)) { throw 'Enki logo missing from Windows build input' }
           python tools/patch_windows_261.py
           python tools/prepare_283_windows.py
           python -m py_compile win/app.py win/uniquify_engine.py
+          if (!(Test-Path win/EnkiAgencyUniq.png)) { throw 'Enki logo missing before packaging' }
       - name: Engine smoke test
         shell: powershell
         timeout-minutes: 8
