@@ -32,7 +32,9 @@ jobs:
           Copy-Item work281/captions.json win/captions.json
           python tools/patch_windows_261.py
           python tools/patch_282_encoding.py
+          (Get-Content win/app.py -Raw).Replace('APP_VERSION = "2.6.1"','APP_VERSION = "2.8.2"').Replace('APP_VERSION = "2.8.1"','APP_VERSION = "2.8.2"') | Set-Content win/app.py -Encoding UTF8
           python -m py_compile win/app.py win/uniquify_engine.py
+          python -c "from pathlib import Path; a=Path('win/app.py').read_text(encoding='utf-8-sig'); assert 'APP_VERSION = \"2.8.2\"' in a; print('Windows APP_VERSION 2.8.2 OK')"
       - name: Engine smoke test
         shell: powershell
         timeout-minutes: 8
